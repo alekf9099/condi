@@ -90,7 +90,7 @@ $env:CONDI_CONFIG = "config/test-config.member.json"; npx playwright test
 | 잡 | 트리거 | 하는 일 |
 |---|---|---|
 | `validate` | main push, PR | `tsc --noEmit` + `config/*.json` 전 프로필 스키마 검증 + 테스트 디스커버리 |
-| `auto-merge` | PR (라벨 `automerge`) | `validate` 성공 시 squash 머지 + 브랜치 삭제 |
+| `auto-merge` | PR (라벨 `automerge`) | GitHub 네이티브 auto-merge를 켬 |
 
 자동 머지를 쓰려면 PR에 **`automerge` 라벨**만 붙이면 됩니다.
 
@@ -98,13 +98,22 @@ $env:CONDI_CONFIG = "config/test-config.member.json"; npx playwright test
 gh pr create --fill --label automerge
 ```
 
-`auto-merge` 잡은 `needs: validate` 이므로 CI가 실패하면 실행 자체가 되지 않습니다.
-라벨이 없는 PR은 검증만 하고 머지하지 않습니다.
+라벨이 붙으면 워크플로가 auto-merge를 켜두고, 실제 병합은 **required status check가
+전부 통과한 뒤 GitHub가** 수행합니다. 라벨이 없는 PR은 검증만 하고 머지하지 않습니다.
 
-> **참고** — GitHub 네이티브 auto-merge와 브랜치 보호 규칙은 Free 플랜의 비공개 저장소에서
-> 사용할 수 없습니다. 그래서 Actions가 직접 머지하는 방식을 씁니다. 다만 브랜치 보호가 아니므로
-> 이는 강제 규칙이 아닌 관례이며, main에 직접 push하는 것은 여전히 막히지 않습니다.
-> 강제 규칙이 필요하면 저장소를 public으로 전환하거나 GitHub Pro가 필요합니다.
+### 브랜치 보호 (main)
+
+`main`에는 룰셋 `main protection`이 걸려 있습니다.
+
+| 규칙 | 효과 |
+|---|---|
+| `pull_request` | main 직접 push 차단 — 반드시 PR 경유 (승인 0건, squash만 허용) |
+| `required_status_checks` | `Type-check & config validation` 통과 필수 |
+| `non_fast_forward` | force push 차단 |
+| `deletion` | main 삭제 차단 |
+
+Vercel을 연결한 뒤 배포 성공까지 머지 조건에 넣으려면,
+룰셋의 required status checks에 Vercel 체크를 추가하면 auto-merge가 그것까지 기다립니다.
 
 ### 실제 브라우저 테스트를 CI에서 돌리려면
 
