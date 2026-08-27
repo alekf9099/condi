@@ -40,12 +40,11 @@ jobs:
           done
 
   # ── CI 통과 시 자동 머지 ──
-  # GitHub 네이티브 auto-merge는 Free 플랜 비공개 저장소에서 사용할 수 없어,
-  # validate 잡 성공을 전제로 Actions가 직접 squash 머지한다.
-  # needs: validate 덕분에 CI가 실패하면 이 잡은 아예 실행되지 않는다.
+  # GitHub 네이티브 auto-merge를 켜기만 한다. 실제 병합 시점은 GitHub가 판단하며,
+  # 브랜치 룰셋의 required status check가 전부 통과해야 병합된다.
+  # Vercel을 연결한 뒤 배포 체크를 required로 추가하면 그것까지 기다린다.
   auto-merge:
-    name: Auto-merge on green
-    needs: validate
+    name: Arm auto-merge
     if: >-
       github.event_name == 'pull_request' &&
       !github.event.pull_request.draft &&
@@ -55,8 +54,8 @@ jobs:
       contents: write
       pull-requests: write
     steps:
-      - name: Squash merge the pull request
-        run: gh pr merge "$PR_URL" --squash --delete-branch
+      - name: Enable auto-merge
+        run: gh pr merge "$PR_URL" --auto --squash --delete-branch
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
