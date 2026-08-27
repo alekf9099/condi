@@ -1,6 +1,8 @@
 node_modules/
 test-results/
 playwright-report/
+public/
+.vercel/
 blob-report/
 .env
 *.local.json

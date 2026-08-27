@@ -120,6 +120,40 @@ gh pr create --fill --label automerge
           CONDI_CLIENT_SECRET: ${{ secrets.CONDI_CLIENT_SECRET }}
 ```
 
+## Vercel 배포 (PR 프리뷰 링크)
+
+Vercel은 **머지를 수행하지 않습니다.** 머지는 위의 GitHub Actions가 담당하고,
+Vercel이 더해주는 건 PR마다 붙는 **배포 프리뷰 링크**입니다.
+
+Condi는 테스트 엔진이라 배포할 웹앱이 없으므로, `npm run build`가
+배포할 만한 정적 사이트를 생성합니다.
+
+- `config/*.json` 프로필 요약 — 어떤 타겟을 어떤 조건으로 검증하는지
+- `playwright-report/` 가 있으면 `/report/` 경로로 함께 서빙
+
+```bash
+npm run build   # -> public/
+```
+
+### 연결 방법 (최초 1회, 브라우저에서 직접)
+
+Vercel↔GitHub 연결은 OAuth 승인이 필요해 대시보드에서 직접 하셔야 합니다.
+
+1. [vercel.com/new](https://vercel.com/new) 접속 후 GitHub 계정으로 로그인
+2. **Import Git Repository** 에서 `alekf9099/condi` 선택
+   - 목록에 없으면 *Adjust GitHub App Permissions* 로 이 저장소에 접근 권한 부여
+3. 빌드 설정은 [vercel.json](vercel.json)에 이미 있으므로 그대로 **Deploy**
+   - Build Command: `npm run build` / Output Directory: `public`
+
+연결이 끝나면 이후 모든 PR에 Vercel 봇이 프리뷰 URL을 코멘트로 남기고,
+저장소 우측 **Deployments** 에도 링크가 노출됩니다.
+
+### 배포 상태를 머지 조건으로 걸려면
+
+`.github/workflows/ci.yml` 의 `auto-merge` 잡에 Vercel 배포 성공 대기를 추가해야 합니다.
+다만 Free 플랜 비공개 저장소에서는 required status check를 강제할 수 없으므로,
+확실히 하려면 저장소를 public으로 전환하거나 GitHub Pro가 필요합니다.
+
 ## 테스트 작성 규칙
 
 - `@playwright/test`가 아닌 `fixtures/condi-fixtures`의 `test`/`expect`를 import
