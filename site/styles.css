@@ -246,6 +246,28 @@ section { padding: clamp(3.5rem, 8vw, 6.5rem) 0; }
 .chips b { color: var(--accent); font-weight: 500; }
 
 /* ── 설치 ── */
+.download-card {
+  display: flex; align-items: center; gap: 1rem; text-decoration: none;
+  background: linear-gradient(135deg, rgba(79, 70, 229, .22), rgba(139, 133, 245, .1));
+  border: 1px solid var(--accent-dim); border-radius: 12px;
+  padding: 1.1rem 1.3rem; margin-bottom: 2.2rem;
+}
+.download-card:hover { border-color: var(--accent); background: linear-gradient(135deg, rgba(79, 70, 229, .32), rgba(139, 133, 245, .16)); }
+.dl-icon { font-size: 1.5rem; color: var(--accent); }
+.dl-text { flex: 1; min-width: 0; }
+.dl-text b { display: block; font-family: var(--mono); font-size: .92rem; overflow-wrap: anywhere; }
+.dl-text em { display: block; font-style: normal; font-size: .76rem; color: var(--muted); }
+.dl-go {
+  flex-shrink: 0; background: var(--accent-dim); color: #fff;
+  padding: .45rem .95rem; border-radius: 8px; font-size: .84rem; font-weight: 600;
+}
+
+.from-source { margin-top: 2rem; border: 1px solid var(--border); border-radius: 10px; background: var(--card); }
+.from-source summary { cursor: pointer; padding: .8rem 1.1rem; font-size: .86rem; color: var(--muted); }
+.from-source summary:hover { color: var(--fg); }
+.from-source .code { margin: 0 1.1rem; border: none; background: var(--bg-soft); }
+.from-source p { margin: .8rem 1.1rem 1.1rem; color: var(--muted); font-size: .82rem; }
+
 .steps { list-style: none; counter-reset: s; padding: 0; margin: 0; display: grid; gap: 1.2rem; }
 .steps li {
   counter-increment: s; position: relative; padding-left: 3rem;

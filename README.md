@@ -46,6 +46,12 @@ tests/      시나리오 + 확장 러너 자체 테스트(ui-runner.spec.ts)
 
 스토어에 올리지 않고 압축 해제된 확장으로 바로 씁니다.
 
+**ZIP으로 받기 (가장 빠름)** — [condi-five.vercel.app](https://condi-five.vercel.app) 에서
+ZIP을 받아 압축을 풀고, `chrome://extensions` → **개발자 모드** → **압축해제된 확장 프로그램을 로드**
+→ 푼 폴더 선택. ZIP은 배포 시 `extension/`을 그대로 묶어 생성되므로 항상 최신입니다.
+
+**소스에서 쓰기 (CI까지 함께 돌릴 때)**
+
 1. `npm run sync:ext` — 공유 모듈을 확장으로 복사
 2. Chrome에서 `chrome://extensions` 열기 → 우측 상단 **개발자 모드** 켜기
 3. **압축해제된 확장 프로그램을 로드** → 이 저장소의 `extension/` 폴더 선택
