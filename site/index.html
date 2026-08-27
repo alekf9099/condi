@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Condi — 조건이 바뀌면 검증도 바뀐다</title>
+<meta name="description" content="설정 파일의 조건에 따라 API 선행 세팅 후 웹 UI 자동화를 수행하는 크롬 확장 QA 툴. 타겟도 셀렉터도 코드에 없습니다.">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="nav">
+  <a class="brand" href="#top">
+    <span class="logo">◆</span>
+    <span><b>CONDI</b><em>CONDITIONAL QA ENGINE</em></span>
+  </a>
+  <nav>
+    <a href="#demo">데모</a>
+    <a href="#features">기능</a>
+    <a href="#schema">설정</a>
+    <a href="#install">설치</a>
+    <a class="ghost" href="https://github.com/alekf9099/condi">GitHub</a>
+  </nav>
+</header>
+
+<main id="top">
+
+  <section class="hero">
+    <p class="badge"><span class="dot"></span>Chrome Extension · Manifest V3 · QA Tool</p>
+    <h1>
+      <span class="k">조건</span>이 바뀌면<br>
+      <span class="k2">검증</span>도 바뀐다
+    </h1>
+    <p class="lede">
+      역할이 <b>admin</b>이냐 <b>member</b>냐에 따라, 주문이 <b>있느냐 없느냐</b>에 따라
+      확인해야 할 화면은 매번 달라집니다. Condi는 그 분기를 <b>코드가 아니라 설정</b>에 둡니다.
+      타겟 URL도, 셀렉터도, API 선행 세팅도 전부 JSON 한 장입니다.
+    </p>
+    <div class="cta">
+      <a class="primary" href="#install">확장 설치하기</a>
+      <a class="secondary" href="#demo">▶ 설치 없이 데모 먼저</a>
+      <a class="secondary" href="https://github.com/alekf9099/condi">GitHub</a>
+    </div>
+    <p class="hint">압축 해제 후 <code>chrome://extensions</code> 에서 로드 · 빌드 불필요</p>
+
+    <ul class="stats">
+      <li><b>0</b><span>코드에 박힌 셀렉터</span></li>
+      <li><b>1</b><span>설정으로 타겟 교체</span></li>
+      <li><b>2</b><span>확장 · CI 동시 실행</span></li>
+      <li><b>11</b><span>선언적 UI 액션</span></li>
+    </ul>
+  </section>
+
+  <!-- ── 인터랙티브 데모 ── -->
+  <section id="demo" class="demo">
+    <div class="section-head">
+      <h2>조건을 바꿔서 직접 돌려보세요</h2>
+      <p>아래 데모는 확장에 들어 있는 <b>실제 실행기 코드</b>가 샌드박스 페이지를 상대로 동작합니다. 흉내가 아닙니다.</p>
+    </div>
+
+    <div class="demo-grid">
+      <!-- 조건 -->
+      <div class="panel">
+        <h3>조건</h3>
+        <div class="cond">
+          <label for="role">userRole</label>
+          <div class="seg" id="role" role="radiogroup">
+            <button class="is-on" data-v="admin">admin</button>
+            <button data-v="member">member</button>
+            <button data-v="guest">guest</button>
+          </div>
+        </div>
+        <div class="cond">
+          <label for="data">testDataCondition</label>
+          <div class="seg" id="data" role="radiogroup">
+            <button class="is-on" data-v="hasActiveOrder">hasActiveOrder</button>
+            <button data-v="noOrder">noOrder</button>
+          </div>
+        </div>
+        <button id="run" class="run">▶ 실행</button>
+        <p class="note">조건에 맞는 단계만 실행되고, 나머지는 <code>when</code> 필터로 걸러집니다.</p>
+      </div>
+
+      <!-- 샌드박스 -->
+      <div class="panel viewport">
+        <h3>대상 페이지 <span class="tag">샌드박스</span></h3>
+        <iframe id="sandbox" title="Condi 데모 샌드박스"></iframe>
+      </div>
+
+      <!-- 결과 -->
+      <div class="panel">
+        <h3>실행 결과 <span id="summary" class="tag"></span></h3>
+        <ol id="log" class="log"><li class="idle">실행을 누르면 단계별 결과가 여기에 쌓입니다.</li></ol>
+      </div>
+    </div>
+
+    <details class="flow-src">
+      <summary>이 데모가 실행하는 <code>uiFlow</code> 보기</summary>
+      <pre id="flow-json"></pre>
+    </details>
+  </section>
+
+  <!-- ── 기능 ── -->
+  <section id="features" class="features">
+    <div class="section-head">
+      <h2>무엇을 해결하나</h2>
+    </div>
+    <div class="cards">
+      <article>
+        <h3>타겟이 코드에 없다</h3>
+        <p>URL·API 엔드포인트·셀렉터가 전부 설정에서 옵니다. 다른 사이트를 검증하려면 JSON만 바꾸면 되고, 테스트 코드는 손대지 않습니다.</p>
+      </article>
+      <article>
+        <h3>UI 전에 API로 상태를 만든다</h3>
+        <p>브라우저를 띄우기 전에 토큰을 발급하고 데이터를 시딩합니다. 로그인 화면을 매번 클릭해 통과할 필요가 없습니다.</p>
+      </article>
+      <article>
+        <h3>조건부 분기가 선언적</h3>
+        <p>API 스텝도 UI 단계도 <code>when</code> 한 줄로 조건부 실행됩니다. if 문을 테스트 코드에 흩뿌리지 않습니다.</p>
+      </article>
+      <article>
+        <h3>셀렉터를 클릭으로 수집</h3>
+        <p>페이지에서 요소를 클릭하면 <code>data-testid</code> → <code>id</code> → 최단 CSS 순으로 안정적인 셀렉터를 뽑아 설정에 넣습니다.</p>
+      </article>
+      <article>
+        <h3>실제 세션 그대로</h3>
+        <p>확장이라 이미 로그인된 브라우저 세션과 사내망을 그대로 씁니다. 별도 러너를 망 안에 둘 필요가 없습니다.</p>
+      </article>
+      <article>
+        <h3>같은 설정을 CI도 실행</h3>
+        <p><code>uiFlow</code>를 설정에 두었기에 Playwright 러너가 동일한 정의를 그대로 돌립니다. 확장에서 만든 흐름이 곧 회귀 테스트입니다.</p>
+      </article>
+    </div>
+  </section>
+
+  <!-- ── 설정 스키마 ── -->
+  <section id="schema" class="schema">
+    <div class="section-head">
+      <h2>설정 한 장이 전부</h2>
+      <p>이 JSON이 확장과 CI 양쪽의 유일한 입력입니다.</p>
+    </div>
+
+    <div class="schema-grid">
+      <pre class="code"><code><span class="c">// 어디를 검증할지</span>
+<span class="k">"target"</span>: { <span class="k">"baseUrl"</span>, <span class="k">"apiBaseUrl"</span> },
+
+<span class="c">// 어떤 조건에서 검증할지 — 키는 자유롭게 확장</span>
+<span class="k">"conditions"</span>: { <span class="k">"userRole"</span>: <span class="s">"admin"</span>, ... },
+
+<span class="c">// 논리 이름 → 실제 셀렉터</span>
+<span class="k">"selectors"</span>: { <span class="k">"adminMenu"</span>: <span class="s">"[data-testid=admin]"</span> },
+
+<span class="c">// UI 전에 상태 만들기 (when으로 조건부)</span>
+<span class="k">"apiSetup"</span>: { <span class="k">"steps"</span>: [ { <span class="k">"name"</span>, <span class="k">"when"</span>, <span class="k">"request"</span>, <span class="k">"extract"</span> } ] },
+
+<span class="c">// 산출물을 브라우저로</span>
+<span class="k">"injection"</span>: { <span class="k">"cookies"</span>, <span class="k">"localStorage"</span>, <span class="k">"extraHTTPHeaders"</span> },
+
+<span class="c">// 무엇을 확인할지</span>
+<span class="k">"uiFlow"</span>: [ { <span class="k">"action"</span>, <span class="k">"target"</span>, <span class="k">"value"</span>, <span class="k">"when"</span> } ]</code></pre>
+
+      <div>
+        <h3>uiFlow 액션</h3>
+        <table class="actions">
+          <tr><td><code>goto</code></td><td>baseUrl 기준 경로 이동</td></tr>
+          <tr><td><code>waitForUrl</code></td><td>URL에 값이 포함될 때까지 대기</td></tr>
+          <tr><td><code>click</code> <code>check</code></td><td>클릭 · 체크박스 체크</td></tr>
+          <tr><td><code>fill</code> <code>select</code></td><td>입력 · 옵션 선택</td></tr>
+          <tr><td><code>expectVisible</code></td><td>요소가 보여야 함</td></tr>
+          <tr><td><code>expectHidden</code></td><td>요소가 없어야 함</td></tr>
+          <tr><td><code>expectText</code></td><td>텍스트 포함 검증</td></tr>
+          <tr><td><code>expectValue</code></td><td>입력값 일치 검증</td></tr>
+          <tr><td><code>expectCount</code></td><td>요소 개수 검증</td></tr>
+        </table>
+        <p class="note">모든 액션은 <b>명시적 대기</b>를 거칩니다. 실패하면 무엇을 기다렸는지가 메시지에 담깁니다.</p>
+      </div>
+    </div>
+
+    <div class="profiles">
+      <h3>저장소에 커밋된 프로필</h3>
+      <div id="profile-cards" class="profile-cards"></div>
+    </div>
+  </section>
+
+  <!-- ── 설치 ── -->
+  <section id="install" class="install">
+    <div class="section-head">
+      <h2>설치</h2>
+      <p>스토어 심사 없이 압축 해제된 확장으로 바로 씁니다.</p>
+    </div>
+    <ol class="steps">
+      <li>
+        <h3>저장소를 받고 공유 모듈을 동기화</h3>
+        <pre class="code"><code>git clone https://github.com/alekf9099/condi
+cd condi &amp;&amp; npm install &amp;&amp; npm run sync:ext</code></pre>
+      </li>
+      <li>
+        <h3><code>chrome://extensions</code> 에서 개발자 모드 켜기</h3>
+        <p>우측 상단 토글입니다.</p>
+      </li>
+      <li>
+        <h3>압축해제된 확장 프로그램을 로드 → <code>extension/</code> 선택</h3>
+        <p>툴바의 Condi 아이콘을 누르면 사이드 패널이 열립니다.</p>
+      </li>
+      <li>
+        <h3>설정을 넣고 셀렉터를 클릭으로 채우기</h3>
+        <p><b>설정</b> 탭에 JSON을 붙여넣고, <b>셀렉터</b> 탭에서 대상 페이지의 요소를 클릭하면 자동으로 추가됩니다.</p>
+      </li>
+    </ol>
+  </section>
+
+</main>
+
+<footer>
+  <p><b>Condi</b> · 범용 조건부 자동화 테스트 엔진</p>
+  <p><a href="https://github.com/alekf9099/condi">github.com/alekf9099/condi</a></p>
+</footer>
+
+<script id="condi-runner-src" type="text/plain"><!--CONDI_RUNNER--></script>
+<script>window.__CONDI_PROFILES__ = /*<!--CONDI_PROFILES-->*/[];</script>
+<script src="demo.js"></script>
+</body>
+</html>
