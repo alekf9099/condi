@@ -37,11 +37,11 @@
       타겟 URL도, 셀렉터도, API 선행 세팅도 전부 JSON 한 장입니다.
     </p>
     <div class="cta">
-      <a class="primary" href="#install">확장 설치하기</a>
+      <a class="primary" href="{{ZIP_NAME}}" download>⬇ ZIP 다운로드 · v{{VERSION}}</a>
       <a class="secondary" href="#demo">▶ 설치 없이 데모 먼저</a>
       <a class="secondary" href="https://github.com/alekf9099/condi">GitHub</a>
     </div>
-    <p class="hint">압축 해제 후 <code>chrome://extensions</code> 에서 로드 · 빌드 불필요</p>
+    <p class="hint">{{ZIP_SIZE}} · 압축 해제 후 <code>chrome://extensions</code> 에서 로드 · 빌드 불필요</p>
 
     <ul class="stats">
       <li><b>0</b><span>코드에 박힌 셀렉터</span></li>
@@ -186,20 +186,29 @@
   <section id="install" class="install">
     <div class="section-head">
       <h2>설치</h2>
-      <p>스토어 심사 없이 압축 해제된 확장으로 바로 씁니다.</p>
+      <p>스토어 심사 없이 압축 해제된 확장으로 바로 씁니다. 빌드 과정이 필요 없습니다.</p>
     </div>
+
+    <a class="download-card" href="{{ZIP_NAME}}" download>
+      <span class="dl-icon">⬇</span>
+      <span class="dl-text">
+        <b>{{ZIP_NAME}}</b>
+        <em>{{ZIP_SIZE}} · Manifest V3 · Chrome 114+</em>
+      </span>
+      <span class="dl-go">다운로드</span>
+    </a>
+
     <ol class="steps">
       <li>
-        <h3>저장소를 받고 공유 모듈을 동기화</h3>
-        <pre class="code"><code>git clone https://github.com/alekf9099/condi
-cd condi &amp;&amp; npm install &amp;&amp; npm run sync:ext</code></pre>
+        <h3>ZIP을 받아 압축 해제</h3>
+        <p>원하는 위치에 풀어둡니다. 폴더 안에 <code>manifest.json</code> 이 보이면 맞습니다.</p>
       </li>
       <li>
         <h3><code>chrome://extensions</code> 에서 개발자 모드 켜기</h3>
         <p>우측 상단 토글입니다.</p>
       </li>
       <li>
-        <h3>압축해제된 확장 프로그램을 로드 → <code>extension/</code> 선택</h3>
+        <h3>압축해제된 확장 프로그램을 로드 → 푼 폴더 선택</h3>
         <p>툴바의 Condi 아이콘을 누르면 사이드 패널이 열립니다.</p>
       </li>
       <li>
@@ -207,6 +216,14 @@ cd condi &amp;&amp; npm install &amp;&amp; npm run sync:ext</code></pre>
         <p><b>설정</b> 탭에 JSON을 붙여넣고, <b>셀렉터</b> 탭에서 대상 페이지의 요소를 클릭하면 자동으로 추가됩니다.</p>
       </li>
     </ol>
+
+    <details class="from-source">
+      <summary>소스에서 직접 쓰기 (CI까지 함께 돌릴 때)</summary>
+      <pre class="code"><code>git clone https://github.com/alekf9099/condi
+cd condi &amp;&amp; npm install &amp;&amp; npm run sync:ext
+<span class="c"># chrome://extensions 에서 extension/ 폴더를 로드</span></code></pre>
+      <p>Playwright 러너로 같은 설정을 CI에서 돌리려면 이쪽입니다.</p>
+    </details>
   </section>
 
 </main>

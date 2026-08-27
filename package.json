@@ -4,7 +4,7 @@
   "description": "Condi - Universal conditional test automation engine (target-agnostic, config-driven)",
   "private": true,
   "scripts": {
-    "build": "node scripts/build-site.mjs",
+    "build": "node scripts/sync-extension.mjs && node scripts/build-site.mjs",
     "sync:ext": "node scripts/sync-extension.mjs",
     "check:ext": "node scripts/sync-extension.mjs --check",
     "test": "playwright test",
@@ -14,6 +14,7 @@
   "devDependencies": {
     "@playwright/test": "^1.49.0",
     "@types/node": "^22.10.0",
+    "jszip": "^3.10.1",
     "typescript": "^5.7.0"
   }
 }

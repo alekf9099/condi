@@ -9,13 +9,15 @@
  */
 import * as fs from 'fs';
 import * as path from 'path';
+import JSZip from 'jszip';
 
 const root = path.resolve(import.meta.dirname, '..');
 const siteDir = path.join(root, 'site');
 const outDir = path.join(root, 'public');
 const configDir = path.join(root, 'config');
 const reportDir = path.join(root, 'playwright-report');
-const runnerPath = path.join(root, 'extension', 'content', 'runner.js');
+const extensionDir = path.join(root, 'extension');
+const runnerPath = path.join(extensionDir, 'content', 'runner.js');
 
 fs.rmSync(outDir, { recursive: true, force: true });
 fs.mkdirSync(outDir, { recursive: true });
@@ -40,11 +42,39 @@ const profiles = fs
 // <script type="text/plain"> 안에 넣으므로 </script> 만 깨뜨리지 않으면 된다.
 const runner = fs.readFileSync(runnerPath, 'utf-8').replace(/<\/script>/gi, '<\\/script>');
 
+// ── 확장을 ZIP으로 묶어 함께 배포 ──
+// 받는 사람이 압축만 풀어 chrome://extensions 에 로드할 수 있게 한다.
+const manifest = JSON.parse(fs.readFileSync(path.join(extensionDir, 'manifest.json'), 'utf-8'));
+const zipName = `condi-extension-v${manifest.version}.zip`;
+
+const zip = new JSZip();
+for (const rel of walk(extensionDir)) {
+  zip.file(rel.split(path.sep).join('/'), fs.readFileSync(path.join(extensionDir, rel)));
+}
+const zipBuffer = await zip.generateAsync({
+  type: 'nodebuffer',
+  compression: 'DEFLATE',
+  compressionOptions: { level: 9 },
+});
+fs.writeFileSync(path.join(outDir, zipName), zipBuffer);
+const zipKB = (zipBuffer.length / 1024).toFixed(0);
+
 let html = fs.readFileSync(path.join(siteDir, 'index.html'), 'utf-8');
 html = html.replace('<!--CONDI_RUNNER-->', runner);
 html = html.replace('/*<!--CONDI_PROFILES-->*/[]', JSON.stringify(profiles));
+html = html.replaceAll('{{ZIP_NAME}}', zipName);
+html = html.replaceAll('{{ZIP_SIZE}}', `${zipKB}KB`);
+html = html.replaceAll('{{VERSION}}', manifest.version);
 
 fs.writeFileSync(path.join(outDir, 'index.html'), html, 'utf-8');
+
+/** 디렉토리를 재귀 순회하며 상대 경로 목록을 반환 */
+function walk(dir, base = dir) {
+  return fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const full = path.join(dir, entry.name);
+    return entry.isDirectory() ? walk(full, base) : [path.relative(base, full)];
+  });
+}
 
 // ── 나머지 정적 자산 복사 ──
 for (const file of fs.readdirSync(siteDir)) {
@@ -58,5 +88,5 @@ if (hasReport) fs.cpSync(reportDir, path.join(outDir, 'report'), { recursive: tr
 
 console.log(
   `[condi] public/ 생성 완료 — 프로필 ${profiles.length}개, 실행기 ${(runner.length / 1024).toFixed(1)}KB, ` +
-  `리포트 ${hasReport ? '포함' : '없음'}`,
+  `${zipName} ${zipKB}KB, 리포트 ${hasReport ? '포함' : '없음'}`,
 );
