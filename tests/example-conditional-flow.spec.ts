@@ -1,47 +1,24 @@
-import { test, expect } from '../fixtures/condi-fixtures';
+import { test } from '../fixtures/condi-fixtures';
 
 /**
- * 예시 시나리오: 조건(conditions)에 따라 동적으로 분기하는 범용 테스트.
+ * 예시 시나리오: 설정의 선언적 uiFlow를 Playwright 러너가 그대로 실행한다.
  *
- * 이 파일에는 URL도, 셀렉터 문자열도 등장하지 않는다.
- * 모든 타겟 정보는 config/test-config.json 에서 온다.
+ * 이 파일에는 URL도, 셀렉터도, 단계 정의도 없다.
+ * 흐름은 config/test-config.json 의 uiFlow 한 곳에만 있고,
+ * Chrome 확장도 **같은 정의**를 실행한다. 두 벌로 갈라지지 않는다.
+ *
  * 다른 사이트를 검증하려면 설정 파일만 교체하면 된다.
  *   예) CONDI_CONFIG=config/another-site.json npx playwright test
+ *
+ * 실제 타겟이 필요하므로 CI 기본 실행에서는 제외된다.
+ * 설정 자체의 정합성(target이 selectors에 있는지 등)은 validateConfig가 CI에서 검사한다.
  */
 
-test.describe('Condi 조건부 진입 플로우', () => {
-  test('API 선행 세팅 후 역할(userRole)에 맞는 화면이 노출된다', async ({ condi, condiPage }) => {
-    // API 세팅에서 발급된 토큰이 이미 localStorage/헤더로 주입된 상태로 진입
+test.describe('Condi 조건부 플로우', () => {
+  test('설정의 uiFlow가 조건에 맞게 실행된다', async ({ condi, condiPage }) => {
+    test.skip(!condi.uiFlow?.length, '설정에 uiFlow가 없습니다');
+
     await condiPage.goto('/');
-    await condiPage.expectVisible('welcomeBanner');
-
-    // ── conditions 기반 동적 분기 ──
-    switch (condi.conditions.userRole) {
-      case 'admin':
-        await condiPage.expectVisible('adminDashboardMenu');
-        break;
-      case 'member':
-        await condiPage.expectHidden('adminDashboardMenu');
-        await condiPage.expectVisible('myPageLink');
-        break;
-      default:
-        // 비로그인 등 그 외 조건: 로그인 폼이 노출되어야 함
-        await condiPage.expectVisible('loginEmailInput');
-    }
-  });
-
-  test('선행 생성된 테스트 데이터가 UI에 반영된다', async ({ condi, condiPage }) => {
-    // 이 조건이 아닐 때는 시나리오 자체를 건너뛴다 (조건부 실행)
-    test.skip(
-      condi.conditions.testDataCondition !== 'hasActiveOrder',
-      'hasActiveOrder 조건에서만 유효한 시나리오',
-    );
-
-    await condiPage.goto('/orders');
-    await condiPage.expectVisible('orderListItem');
-
-    // 주문이 1건 이상 존재해야 함 (API 세팅에서 seed된 데이터)
-    const count = await condiPage.el('orderListItem').count();
-    expect(count, 'API로 선행 생성한 주문이 목록에 있어야 합니다').toBeGreaterThan(0);
+    await condiPage.runUiFlow();
   });
 });

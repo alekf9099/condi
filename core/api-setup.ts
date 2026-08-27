@@ -1,5 +1,6 @@
 import { APIRequestContext, request as playwrightRequest } from '@playwright/test';
-import { getByPath, resolveDeep, resolveTemplate, TemplateContext } from './config-loader';
+import { TemplateContext } from './config-loader';
+import { getByPath, matchesWhen, resolveDeep, resolveTemplate } from './template.js';
 import { ApiSetupStep, CondiConfig } from './types';
 
 /**
@@ -24,7 +25,7 @@ export async function runApiSetup(config: CondiConfig): Promise<Record<string, u
     for (const step of config.apiSetup.steps) {
       const ctx: TemplateContext = { conditions: config.conditions, vars, env: process.env };
 
-      if (!shouldRun(step, ctx)) {
+      if (!matchesWhen(step.when, ctx)) {
         console.log(`[Condi][api-setup] SKIP  ${step.name} (when 조건 불일치)`);
         continue;
       }
@@ -36,11 +37,6 @@ export async function runApiSetup(config: CondiConfig): Promise<Record<string, u
   }
 
   return vars;
-}
-
-function shouldRun(step: ApiSetupStep, ctx: TemplateContext): boolean {
-  if (!step.when) return true;
-  return Object.entries(step.when).every(([path, expected]) => getByPath(ctx, path) === expected);
 }
 
 async function executeStep(

@@ -9,7 +9,7 @@
  *
  * 패널로는 진행 상황을 이벤트로 흘려보낸다.
  */
-import { matchesWhen, resolveDeep, resolveTemplate, getByPath, validateConfig } from './lib/template.js';
+import { matchesWhen, resolveDeep, resolveTemplate, getByPath, validateConfig, resolveInjection } from './lib/template.js';
 
 const DNR_RULE_ID_BASE = 9000;
 
@@ -63,8 +63,15 @@ async function run(config, tabId) {
   }
 
   // ── 2. 주입 ──
-  const injection = config.injection ? resolveDeep(config.injection, ctx()) : null;
-  if (injection) {
+  // 건너뛴 API 스텝의 변수를 참조하는 항목은 주입할 값이 없으므로 항목 단위로 떨어뜨린다.
+  let injection = null;
+  if (config.injection) {
+    const resolved = resolveInjection(config.injection, ctx());
+    injection = resolved.injection;
+    if (resolved.dropped.length) {
+      emit({ phase: 'inject', status: 'skip', name: `${resolved.dropped.length}개 주입 항목`,
+             detail: `값이 없어 건너뜀: ${resolved.dropped.join(', ')}` });
+    }
     await applyCookies(injection, config.target.baseUrl);
     await applyHeaders(injection, config.target.baseUrl);
     emit({ phase: 'inject', status: 'pass', name: '쿠키/헤더 주입', detail: summarizeInjection(injection) });
@@ -224,12 +231,14 @@ function navigate(tabId, url, timeout) {
       reject(new Error(`페이지 로드 시간 초과 (${timeout}ms)`));
     }, timeout);
 
-    function listener(updatedTabId, info) {
-      if (updatedTabId === tabId && info.status === 'complete') {
-        clearTimeout(timer);
-        chrome.tabs.onUpdated.removeListener(listener);
-        resolve();
-      }
+    // 이전 로드의 잔여 complete 이벤트로 조기 resolve 되지 않도록,
+    // 목적지 URL 이 있으면 실제로 그 주소에 도달했는지 확인한다.
+    function listener(updatedTabId, info, tab) {
+      if (updatedTabId !== tabId || info.status !== 'complete') return;
+      if (url && tab?.url && !tab.url.startsWith(stripHash(url))) return;
+      clearTimeout(timer);
+      chrome.tabs.onUpdated.removeListener(listener);
+      resolve();
     }
     chrome.tabs.onUpdated.addListener(listener);
 
@@ -239,6 +248,11 @@ function navigate(tabId, url, timeout) {
       reject(err);
     });
   });
+}
+
+/** 비교용으로 해시를 떼어낸다 */
+function stripHash(url) {
+  return url.split('#')[0];
 }
 
 async function startPicker(tabId) {

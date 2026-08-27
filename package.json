@@ -13,6 +13,7 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.49.0",
+    "@types/chrome": "^0.2.7",
     "@types/node": "^22.10.0",
     "jszip": "^3.10.1",
     "typescript": "^5.7.0"

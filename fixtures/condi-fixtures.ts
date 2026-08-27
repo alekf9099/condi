@@ -1,8 +1,11 @@
 import { test as base } from '@playwright/test';
-import { loadConfig, resolveDeep, TemplateContext } from '../core/config-loader';
+import { loadConfig, TemplateContext } from '../core/config-loader';
+import { resolveInjection } from '../core/template.js';
 import { runApiSetup } from '../core/api-setup';
 import { CondiPage } from '../core/ui-actions';
-import { CondiConfig, CondiRuntime } from '../core/types';
+import { BrowserInjection, CondiConfig, CondiRuntime } from '../core/types';
+
+type InjectedCookie = NonNullable<BrowserInjection['cookies']>[number];
 
 /**
  * Condi 픽스처.
@@ -48,8 +51,16 @@ export const test = base.extend<CondiTestFixtures, CondiWorkerFixtures>({
     const { config, vars } = condiRuntime;
     const ctx: TemplateContext = { conditions: config.conditions, vars, env: process.env };
 
-    // injection 규칙 내 {{vars.*}} 플레이스홀더를 실제 값으로 치환
-    const injection = config.injection ? resolveDeep(config.injection, ctx) : undefined;
+    // injection 규칙 내 {{vars.*}} 플레이스홀더를 실제 값으로 치환.
+    // 건너뛴 API 스텝의 변수를 참조하는 항목은 주입할 값이 없으므로 항목 단위로 떨어뜨린다.
+    let injection: ReturnType<typeof resolveInjection>['injection'] | undefined;
+    if (config.injection) {
+      const resolved = resolveInjection(config.injection, ctx);
+      injection = resolved.injection;
+      if (resolved.dropped.length) {
+        console.log(`[Condi] 값이 없어 건너뛴 주입 항목: ${resolved.dropped.join(', ')}`);
+      }
+    }
 
     const context = await browser.newContext({
       baseURL: config.target.baseUrl,
@@ -58,7 +69,7 @@ export const test = base.extend<CondiTestFixtures, CondiWorkerFixtures>({
 
     if (injection?.cookies?.length) {
       await context.addCookies(
-        injection.cookies.map((c) => ({
+        injection.cookies.map((c: InjectedCookie) => ({
           name: c.name,
           value: c.value,
           // domain/path 또는 url 중 하나 필수 — 둘 다 없으면 baseUrl 기준으로 주입

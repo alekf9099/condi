@@ -13,11 +13,18 @@
   let active = false;
   let overlay = null;
 
-  chrome.runtime.onMessage.addListener((msg) => {
-    if (msg?.type === 'CONDI_START_PICK') start();
-    if (msg?.type === 'CONDI_STOP_PICK') stop();
-    return false;
-  });
+  // 확장 컨텍스트에서만 메시지를 수신한다.
+  if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
+    chrome.runtime.onMessage.addListener((msg) => {
+      if (msg?.type === 'CONDI_START_PICK') start();
+      if (msg?.type === 'CONDI_STOP_PICK') stop();
+      return false;
+    });
+  }
+
+  // 셀렉터 생성 로직은 순수 DOM 연산이므로 확장 밖에서도 검증할 수 있게 노출한다.
+  window.__condiBuildSelector = buildSelector;
+  window.__condiSuggestName = suggestName;
 
   function start() {
     if (active) return;
@@ -125,13 +132,16 @@
 
   /** 논리 이름 후보를 만들어 준다 (camelCase) */
   function suggestName(el) {
+    // 빈 문자열도 '없음'으로 취급해야 한다. el.id 는 없을 때 null 이 아니라 '' 이므로
+    // ?? 를 쓰면 뒤 후보로 넘어가지 않는다.
     const raw =
-      el.getAttribute('data-testid') ??
-      el.getAttribute('name') ??
-      el.getAttribute('aria-label') ??
-      el.id ??
-      (el.textContent ?? '').trim().slice(0, 20) ??
-      el.tagName.toLowerCase();
+      [
+        el.getAttribute('data-testid'),
+        el.getAttribute('name'),
+        el.getAttribute('aria-label'),
+        el.id,
+        (el.textContent ?? '').trim().slice(0, 20),
+      ].find((v) => v && String(v).trim()) ?? el.tagName.toLowerCase();
 
     const words = String(raw)
       .replace(/[^a-zA-Z0-9가-힣\s_-]/g, '')
