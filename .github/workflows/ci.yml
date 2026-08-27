@@ -26,6 +26,10 @@ jobs:
       - name: Type-check
         run: npx tsc --noEmit
 
+      # 확장의 공유 모듈이 core/template.js 와 갈라지지 않았는지 확인
+      - name: Check extension module sync
+        run: npm run check:ext
+
       # loadConfig()가 playwright.config.ts에서 실행되므로,
       # --list 만으로 설정 스키마 검증 + 픽스처 결선까지 확인된다.
       - name: Validate config & discover tests
@@ -38,6 +42,13 @@ jobs:
             echo "--- $f ---"
             CONDI_CONFIG="$f" npx playwright test --list > /dev/null
           done
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      # 확장 UI 실행기 테스트 — 로컬 픽스처만 쓰므로 실제 타겟 없이 항상 실행 가능
+      - name: Test extension UI runner
+        run: npx playwright test tests/ui-runner.spec.ts
 
   # ── CI 통과 시 자동 머지 ──
   # GitHub 네이티브 auto-merge를 켜기만 한다. 실제 병합 시점은 GitHub가 판단하며,

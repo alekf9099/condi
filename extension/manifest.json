@@ -1,0 +1,26 @@
+{
+  "manifest_version": 3,
+  "name": "Condi — 조건부 자동화 테스트",
+  "version": "0.1.0",
+  "description": "설정 파일의 조건에 따라 API 선행 세팅 후 웹 UI 자동화를 수행하는 범용 테스트 엔진",
+  "permissions": [
+    "storage",
+    "scripting",
+    "cookies",
+    "tabs",
+    "sidePanel",
+    "declarativeNetRequest"
+  ],
+  "host_permissions": ["<all_urls>"],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "side_panel": {
+    "default_path": "panel/panel.html"
+  },
+  "action": {
+    "default_title": "Condi 패널 열기"
+  },
+  "icons": {}
+}

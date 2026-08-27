@@ -80,6 +80,36 @@
     }
   },
 
+  "uiFlow": [
+    {
+      "action": "expectVisible",
+      "target": "welcomeBanner",
+      "description": "토큰 주입 후 로그인된 상태로 진입해야 함"
+    },
+    {
+      "when": { "conditions.userRole": "admin" },
+      "action": "expectVisible",
+      "target": "adminDashboardMenu",
+      "description": "admin에게만 노출되는 메뉴"
+    },
+    {
+      "when": { "conditions.userRole": "member" },
+      "action": "expectHidden",
+      "target": "adminDashboardMenu"
+    },
+    {
+      "when": { "conditions.testDataCondition": "hasActiveOrder" },
+      "action": "goto",
+      "value": "/orders"
+    },
+    {
+      "when": { "conditions.testDataCondition": "hasActiveOrder" },
+      "action": "expectVisible",
+      "target": "orderListItem",
+      "description": "API로 선행 생성한 주문이 목록에 보여야 함"
+    }
+  ],
+
   "waits": {
     "elementTimeout": 10000,
     "navigationTimeout": 30000,
