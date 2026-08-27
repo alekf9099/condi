@@ -1,0 +1,57 @@
+{
+  "profileName": "example-shop-member-scenario",
+
+  "target": {
+    "baseUrl": "https://example-shop.test",
+    "apiBaseUrl": "https://api.example-shop.test"
+  },
+
+  "conditions": {
+    "userRole": "member",
+    "testDataCondition": "noOrder"
+  },
+
+  "selectors": {
+    "loginEmailInput": "#email",
+    "loginPasswordInput": "#password",
+    "loginSubmitButton": "button[type='submit']",
+    "myPageLink": "xpath=//a[contains(@href, '/mypage')]",
+    "adminDashboardMenu": "[data-testid='admin-dashboard']",
+    "orderListItem": ".order-list > li",
+    "welcomeBanner": "[data-testid='welcome-banner']",
+    "logoutButton": "[data-testid='logout']"
+  },
+
+  "apiSetup": {
+    "defaultHeaders": {
+      "Content-Type": "application/json"
+    },
+    "steps": [
+      {
+        "name": "issueToken",
+        "request": {
+          "method": "POST",
+          "path": "/auth/token",
+          "body": {
+            "role": "{{conditions.userRole}}",
+            "clientSecret": "{{env.CONDI_CLIENT_SECRET}}"
+          }
+        },
+        "extract": {
+          "accessToken": "$.data.accessToken"
+        }
+      }
+    ]
+  },
+
+  "injection": {
+    "localStorage": {
+      "accessToken": "{{vars.accessToken}}"
+    }
+  },
+
+  "waits": {
+    "elementTimeout": 10000,
+    "navigationTimeout": 30000
+  }
+}

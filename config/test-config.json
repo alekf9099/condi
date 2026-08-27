@@ -1,0 +1,88 @@
+{
+  "profileName": "example-shop-admin-scenario",
+
+  "target": {
+    "baseUrl": "https://example-shop.test",
+    "apiBaseUrl": "https://api.example-shop.test"
+  },
+
+  "conditions": {
+    "userRole": "admin",
+    "testDataCondition": "hasActiveOrder",
+    "locale": "ko-KR",
+    "featureFlagNewCheckout": true
+  },
+
+  "selectors": {
+    "loginEmailInput": "#email",
+    "loginPasswordInput": "#password",
+    "loginSubmitButton": "button[type='submit']",
+    "myPageLink": "xpath=//a[contains(@href, '/mypage')]",
+    "adminDashboardMenu": "[data-testid='admin-dashboard']",
+    "orderListItem": ".order-list > li",
+    "welcomeBanner": "[data-testid='welcome-banner']",
+    "logoutButton": "[data-testid='logout']"
+  },
+
+  "apiSetup": {
+    "defaultHeaders": {
+      "Content-Type": "application/json",
+      "X-Test-Client": "condi"
+    },
+    "steps": [
+      {
+        "name": "issueToken",
+        "description": "조건의 userRole에 해당하는 계정으로 인증 토큰 발급",
+        "request": {
+          "method": "POST",
+          "path": "/auth/token",
+          "body": {
+            "role": "{{conditions.userRole}}",
+            "clientSecret": "{{env.CONDI_CLIENT_SECRET}}"
+          }
+        },
+        "extract": {
+          "accessToken": "$.data.accessToken",
+          "userId": "$.data.user.id"
+        }
+      },
+      {
+        "name": "seedActiveOrder",
+        "description": "testDataCondition이 hasActiveOrder일 때만 주문 데이터 선행 생성",
+        "when": {
+          "conditions.testDataCondition": "hasActiveOrder"
+        },
+        "request": {
+          "method": "POST",
+          "path": "/test-support/orders",
+          "headers": {
+            "Authorization": "Bearer {{vars.accessToken}}"
+          },
+          "body": {
+            "userId": "{{vars.userId}}",
+            "status": "ACTIVE"
+          }
+        },
+        "extract": {
+          "seededOrderId": "$.data.orderId"
+        },
+        "expectStatus": 201
+      }
+    ]
+  },
+
+  "injection": {
+    "localStorage": {
+      "accessToken": "{{vars.accessToken}}"
+    },
+    "extraHTTPHeaders": {
+      "Authorization": "Bearer {{vars.accessToken}}"
+    }
+  },
+
+  "waits": {
+    "elementTimeout": 10000,
+    "navigationTimeout": 30000,
+    "apiTimeout": 15000
+  }
+}

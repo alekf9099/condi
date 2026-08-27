@@ -1,0 +1,37 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  validate:
+    name: Type-check & config validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Type-check
+        run: npx tsc --noEmit
+
+      # loadConfig()가 playwright.config.ts에서 실행되므로,
+      # --list 만으로 설정 스키마 검증 + 픽스처 결선까지 확인된다.
+      - name: Validate config & discover tests
+        run: npx playwright test --list
+
+      # 저장소에 커밋된 모든 프로필이 스키마를 만족하는지 확인
+      - name: Validate every config profile
+        run: |
+          for f in config/*.json; do
+            echo "--- $f ---"
+            CONDI_CONFIG="$f" npx playwright test --list > /dev/null
+          done
