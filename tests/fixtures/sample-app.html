@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="ko">
+<head><meta charset="utf-8"><title>Condi 테스트 픽스처</title></head>
+<body>
+  <div data-testid="welcome-banner">환영합니다, 테스터님</div>
+
+  <!-- 지연 후 나타나는 요소: 명시적 대기가 동작하는지 확인용 -->
+  <div id="delayed" style="display:none">지연 로딩됨</div>
+
+  <!-- 클릭하면 사라지는 요소: expectHidden 확인용 -->
+  <button data-testid="dismiss">닫기</button>
+  <div data-testid="dismissable">닫을 수 있는 배너</div>
+
+  <input id="email" name="email" type="text">
+  <select id="plan"><option value="free">무료</option><option value="pro">프로</option></select>
+  <input id="agree" type="checkbox">
+
+  <ul class="order-list">
+    <li>주문 A</li>
+    <li>주문 B</li>
+    <li>주문 C</li>
+  </ul>
+
+  <div data-testid="never">이 요소는 항상 보입니다</div>
+
+  <script>
+    // 800ms 뒤 등장 — 폴링 대기가 실제로 기다리는지 검증
+    setTimeout(() => { document.getElementById('delayed').style.display = 'block'; }, 800);
+
+    document.querySelector('[data-testid="dismiss"]').addEventListener('click', () => {
+      document.querySelector('[data-testid="dismissable"]').style.display = 'none';
+    });
+  </script>
+</body>
+</html>

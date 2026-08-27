@@ -1,5 +1,6 @@
 import { expect, Locator, Page } from '@playwright/test';
-import { CondiConfig } from './types';
+import { CondiConfig, UiStep } from './types';
+import { matchesWhen, resolveTemplate } from './template.js';
 
 /**
  * 동적 UI 자동화 헬퍼.
@@ -7,6 +8,8 @@ import { CondiConfig } from './types';
  * - 셀렉터를 코드에 하드코딩하지 않고, 논리 이름(elementName)으로만 접근한다.
  * - 모든 상호작용 전에 명시적 대기(요소 visible 대기)를 공통 적용해
  *   간헐적 실패(flakiness)를 줄인다.
+ * - runUiFlow()는 설정의 선언적 uiFlow를 그대로 실행하므로,
+ *   Chrome 확장과 **동일한 흐름 정의**를 공유한다.
  */
 export class CondiPage {
   private readonly elementTimeout: number;
@@ -71,4 +74,67 @@ export class CondiPage {
   async expectText(elementName: string, text: string | RegExp): Promise<void> {
     await expect(this.el(elementName)).toContainText(text, { timeout: this.elementTimeout });
   }
+
+  /**
+   * 설정의 선언적 uiFlow를 실행한다.
+   * `when` 조건이 맞지 않는 단계는 건너뛴다.
+   */
+  async runUiFlow(vars: Record<string, unknown> = {}): Promise<void> {
+    const ctx = { conditions: this.config.conditions, vars, env: process.env };
+
+    for (const step of this.config.uiFlow ?? []) {
+      if (!matchesWhen(step.when, ctx)) continue;
+      const value = step.value !== undefined ? resolveTemplate(step.value, ctx) : undefined;
+      await this.runStep(step, value);
+    }
+  }
+
+  private async runStep(step: UiStep, value: string | undefined): Promise<void> {
+    const timeout = step.timeout ?? this.elementTimeout;
+    const name = step.target ?? '';
+
+    switch (step.action) {
+      case 'goto':
+        await this.goto(value ?? '/');
+        return;
+      case 'waitForUrl':
+        await this.page.waitForURL(new RegExp(escapeRegExp(value ?? '')), { timeout });
+        return;
+      case 'click':
+        await this.click(name);
+        return;
+      case 'fill':
+        await this.fill(name, value ?? '');
+        return;
+      case 'select':
+        await this.el(name).selectOption(value ?? '', { timeout });
+        return;
+      case 'check':
+        await this.el(name).check({ timeout });
+        return;
+      case 'expectVisible':
+        await expect(this.el(name), `"${name}" 요소가 보여야 합니다`).toBeVisible({ timeout });
+        return;
+      case 'expectHidden':
+        await expect(this.el(name), `"${name}" 요소가 없어야 합니다`).toBeHidden({ timeout });
+        return;
+      case 'expectText':
+        await expect(this.el(name)).toContainText(value ?? '', { timeout });
+        return;
+      case 'expectValue':
+        await expect(this.el(name)).toHaveValue(value ?? '', { timeout });
+        return;
+      case 'expectCount':
+        await expect(this.el(name)).toHaveCount(step.count ?? 0, { timeout });
+        return;
+      default: {
+        const exhaustive: never = step.action;
+        throw new Error(`[Condi] 지원하지 않는 UI 액션: ${exhaustive}`);
+      }
+    }
+  }
+}
+
+function escapeRegExp(input: string): string {
+  return input.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }

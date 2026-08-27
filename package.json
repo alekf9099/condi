@@ -5,6 +5,8 @@
   "private": true,
   "scripts": {
     "build": "node scripts/build-site.mjs",
+    "sync:ext": "node scripts/sync-extension.mjs",
+    "check:ext": "node scripts/sync-extension.mjs --check",
     "test": "playwright test",
     "test:headed": "playwright test --headed",
     "report": "playwright show-report"

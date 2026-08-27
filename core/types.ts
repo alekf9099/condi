@@ -51,6 +51,41 @@ export interface BrowserInjection {
   extraHTTPHeaders?: Record<string, string>;
 }
 
+/** 선언적 UI 액션 종류 */
+export type UiAction =
+  | 'goto'
+  | 'waitForUrl'
+  | 'click'
+  | 'fill'
+  | 'select'
+  | 'check'
+  | 'expectVisible'
+  | 'expectHidden'
+  | 'expectText'
+  | 'expectValue'
+  | 'expectCount';
+
+/**
+ * 선언적 UI 단계.
+ *
+ * UI 흐름을 코드가 아닌 설정에 두는 이유: Playwright 러너와 Chrome 확장이
+ * **같은 흐름 정의**를 실행할 수 있어야 하기 때문. 코드에 두면 확장이 실행할 대상이 없다.
+ */
+export interface UiStep {
+  action: UiAction;
+  /** selectors 맵의 논리 이름. goto/waitForUrl 을 제외한 모든 액션에 필요 */
+  target?: string;
+  /** fill/select 의 입력값, expectText/expectValue 의 기대값, goto 의 경로 등 */
+  value?: string;
+  /** expectCount 의 기대 개수 */
+  count?: number;
+  /** 조건부 실행 필터 — apiSetup 의 when 과 동일 규칙 */
+  when?: Record<string, unknown>;
+  /** 이 단계 전용 타임아웃(ms). 생략 시 waits.elementTimeout */
+  timeout?: number;
+  description?: string;
+}
+
 /** Condi 범용 설정 루트 스키마 */
 export interface CondiConfig {
   /** 사람이 읽기 위한 시나리오 이름 */
@@ -86,6 +121,12 @@ export interface CondiConfig {
 
   /** API 세팅 산출물을 브라우저에 주입하는 규칙 */
   injection?: BrowserInjection;
+
+  /**
+   * 선언적 UI 흐름. Chrome 확장이 이 정의를 그대로 실행하고,
+   * Playwright 러너도 runUiFlow()로 동일하게 실행할 수 있다.
+   */
+  uiFlow?: UiStep[];
 
   /** 공통 대기/타임아웃 정책 */
   waits?: {

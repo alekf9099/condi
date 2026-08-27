@@ -15,14 +15,64 @@
 3. **브라우저 주입** — `injection` 규칙에 따라 쿠키 / localStorage / HTTP 헤더로 주입
 4. **UI 자동화** — `selectors`의 논리 이름으로만 요소에 접근, 모든 상호작용에 명시적 대기 공통 적용
 
+## 두 개의 실행 주체, 하나의 설정
+
+같은 config를 **Chrome 확장**과 **Playwright 러너**가 모두 실행합니다.
+
+| | Chrome 확장 | Playwright 러너 |
+|---|---|---|
+| 용도 | QA가 즉석에서 조건 바꿔가며 검증 | CI에서 반복 실행 |
+| 세션 | 브라우저에 이미 로그인된 실제 세션 | 매번 API로 새로 발급 |
+| 사내망 타겟 | 접근 가능 | 러너가 망 안에 있어야 함 |
+| 셀렉터 수집 | 페이지에서 클릭해 자동 생성 | 수동 작성 |
+
+UI 흐름을 코드가 아닌 `uiFlow`로 설정에 둔 이유가 이것입니다 — 코드에 있으면 확장이 실행할 대상이 없습니다.
+템플릿·조건 로직은 [core/template.js](core/template.js) 한 벌을 양쪽이 공유하며,
+확장용 사본은 `npm run sync:ext`로 복사되고 CI가 동기화를 검사합니다.
+
 ## 디렉토리 구조
 
 ```
 config/     설정 파일 (타겟별로 교체 가능한 JSON)
-core/       엔진 코어 — types(스키마), config-loader, api-setup, ui-actions
+core/       엔진 코어 — template.js(공유 순수 로직), types, config-loader,
+            api-setup, ui-actions(runUiFlow 포함)
+extension/  Chrome MV3 확장 — background(오케스트레이터), content(러너·피커), panel(UI)
 fixtures/   Playwright 픽스처 (condi, condiPage)
-tests/      시나리오 (설정에만 의존하는 범용 테스트)
+scripts/    build-site(Vercel 배포용), sync-extension(공유 모듈 복사)
+tests/      시나리오 + 확장 러너 자체 테스트(ui-runner.spec.ts)
 ```
+
+## Chrome 확장 설치
+
+스토어에 올리지 않고 압축 해제된 확장으로 바로 씁니다.
+
+1. `npm run sync:ext` — 공유 모듈을 확장으로 복사
+2. Chrome에서 `chrome://extensions` 열기 → 우측 상단 **개발자 모드** 켜기
+3. **압축해제된 확장 프로그램을 로드** → 이 저장소의 `extension/` 폴더 선택
+4. 툴바의 Condi 아이콘을 눌러 사이드 패널 열기
+
+### 사용법
+
+**설정 탭** — `config/test-config.json` 을 파일에서 불러오거나 JSON을 붙여넣습니다.
+유효성 검사가 실시간으로 돌고, 설정은 브라우저에 저장돼 다음에도 유지됩니다.
+
+**셀렉터 탭** — `요소 선택 시작`을 누르고 대상 페이지에서 요소를 클릭하면
+안정적인 셀렉터(`data-testid` > `id` > `name` > `aria-label` > 최단 CSS 경로)가
+자동 생성되어 설정의 `selectors`에 추가됩니다. <kbd>Esc</kbd>로 취소합니다.
+
+**실행 탭** — 조건을 즉석에서 바꿔 실행합니다. 실행 순서는 Playwright 러너와 동일합니다:
+
+```
+apiSetup 실행 → 쿠키·헤더 주입 → baseUrl 이동 → 스토리지 주입 후 재로드 → uiFlow 실행
+```
+
+단계별 통과/실패가 패널에 쌓이고, 실패하면 무엇을 기다렸는지가 함께 표시됩니다.
+
+### 확장의 제약
+
+- `extraHTTPHeaders`는 `declarativeNetRequest` 동적 규칙으로 부착되며 **타겟 호스트에만** 적용됩니다
+- 스토리지 주입은 페이지 로드 후에만 가능해 **주입 뒤 한 번 재로드**합니다 (앱이 값을 읽도록)
+- `host_permissions`가 `<all_urls>`인 것은 타겟이 설정으로 정해지기 때문입니다 — 특정 도메인만 쓸 거면 좁히세요
 
 ## 시작하기
 
@@ -57,7 +107,32 @@ $env:CONDI_CONFIG = "config/test-config.member.json"; npx playwright test
   "selectors":  { "논리이름": "CSS 또는 xpath=... 셀렉터" },
   "apiSetup":   { "steps": [ { "name", "when", "request", "extract", "expectStatus" } ] },
   "injection":  { "cookies", "localStorage", "sessionStorage", "extraHTTPHeaders" },
+  "uiFlow":     [ { "action", "target", "value", "count", "when", "timeout" } ],
   "waits":      { "elementTimeout", "navigationTimeout", "apiTimeout" }
+}
+```
+
+### uiFlow 액션
+
+`target`은 `selectors`의 논리 이름이며, `goto`/`waitForUrl`을 뺀 모든 액션에 필요합니다.
+각 단계는 `apiSetup`과 동일한 `when` 규칙으로 조건부 실행됩니다.
+
+| 액션 | 쓰임 |
+|---|---|
+| `goto` | `value` 경로로 이동 (baseUrl 기준) |
+| `waitForUrl` | URL에 `value`가 포함될 때까지 대기 |
+| `click` / `check` | 클릭 / 체크박스 체크 |
+| `fill` / `select` | `value` 입력 / 옵션 선택 |
+| `expectVisible` / `expectHidden` | 표시 / 미표시 검증 |
+| `expectText` / `expectValue` | 텍스트 포함 / 입력값 일치 검증 |
+| `expectCount` | 요소 개수가 `count`와 일치 |
+
+```json
+{
+  "when": { "conditions.userRole": "admin" },
+  "action": "expectVisible",
+  "target": "adminDashboardMenu",
+  "description": "admin에게만 노출되는 메뉴"
 }
 ```
 
@@ -89,7 +164,7 @@ $env:CONDI_CONFIG = "config/test-config.member.json"; npx playwright test
 
 | 잡 | 트리거 | 하는 일 |
 |---|---|---|
-| `validate` | main push, PR | `tsc --noEmit` + `config/*.json` 전 프로필 스키마 검증 + 테스트 디스커버리 |
+| `validate` | main push, PR | `tsc --noEmit` · 확장 모듈 동기화 검사 · `config/*.json` 전 프로필 스키마 검증 · 확장 러너 테스트 8건 |
 | `auto-merge` | PR (라벨 `automerge`) | GitHub 네이티브 auto-merge를 켬 |
 
 자동 머지를 쓰려면 PR에 **`automerge` 라벨**만 붙이면 됩니다.
@@ -115,11 +190,11 @@ gh pr create --fill --label automerge
 Vercel을 연결한 뒤 배포 성공까지 머지 조건에 넣으려면,
 룰셋의 required status checks에 Vercel 체크를 추가하면 auto-merge가 그것까지 기다립니다.
 
-### 실제 브라우저 테스트를 CI에서 돌리려면
+### 실제 타겟 테스트를 CI에서 돌리려면
 
-현재 CI는 검증만 하고 실제 브라우저 테스트는 돌리지 않습니다.
-예시 설정이 가상 타겟(`example-shop.test`)을 가리키기 때문입니다.
-실제 타겟이 준비되면 워크플로에 다음을 추가하세요.
+CI는 확장 러너 테스트(로컬 픽스처)는 돌리지만, `tests/example-conditional-flow.spec.ts`
+같은 실제 타겟 시나리오는 돌리지 않습니다. 예시 설정이 가상 타겟(`example-shop.test`)을
+가리키기 때문입니다. 실제 타겟이 준비되면 워크플로에 다음을 추가하세요.
 
 ```yaml
       - run: npx playwright install --with-deps chromium
