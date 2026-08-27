@@ -83,6 +83,43 @@ $env:CONDI_CONFIG = "config/test-config.member.json"; npx playwright test
 
 `when`의 모든 키(컨텍스트 dot-path)가 기대값과 일치할 때만 실행됩니다.
 
+## CI / 자동 머지
+
+`.github/workflows/ci.yml` 하나가 두 가지 잡을 담당합니다.
+
+| 잡 | 트리거 | 하는 일 |
+|---|---|---|
+| `validate` | main push, PR | `tsc --noEmit` + `config/*.json` 전 프로필 스키마 검증 + 테스트 디스커버리 |
+| `auto-merge` | PR (라벨 `automerge`) | `validate` 성공 시 squash 머지 + 브랜치 삭제 |
+
+자동 머지를 쓰려면 PR에 **`automerge` 라벨**만 붙이면 됩니다.
+
+```bash
+gh pr create --fill --label automerge
+```
+
+`auto-merge` 잡은 `needs: validate` 이므로 CI가 실패하면 실행 자체가 되지 않습니다.
+라벨이 없는 PR은 검증만 하고 머지하지 않습니다.
+
+> **참고** — GitHub 네이티브 auto-merge와 브랜치 보호 규칙은 Free 플랜의 비공개 저장소에서
+> 사용할 수 없습니다. 그래서 Actions가 직접 머지하는 방식을 씁니다. 다만 브랜치 보호가 아니므로
+> 이는 강제 규칙이 아닌 관례이며, main에 직접 push하는 것은 여전히 막히지 않습니다.
+> 강제 규칙이 필요하면 저장소를 public으로 전환하거나 GitHub Pro가 필요합니다.
+
+### 실제 브라우저 테스트를 CI에서 돌리려면
+
+현재 CI는 검증만 하고 실제 브라우저 테스트는 돌리지 않습니다.
+예시 설정이 가상 타겟(`example-shop.test`)을 가리키기 때문입니다.
+실제 타겟이 준비되면 워크플로에 다음을 추가하세요.
+
+```yaml
+      - run: npx playwright install --with-deps chromium
+      - run: npx playwright test
+        env:
+          CONDI_CONFIG: config/staging.json
+          CONDI_CLIENT_SECRET: ${{ secrets.CONDI_CLIENT_SECRET }}
+```
+
 ## 테스트 작성 규칙
 
 - `@playwright/test`가 아닌 `fixtures/condi-fixtures`의 `test`/`expect`를 import
