@@ -48,11 +48,16 @@ $('format').addEventListener('click', () => {
 
 $('download').addEventListener('click', () => {
   if (!config) return;
+  // downloads 권한을 요구하지 않도록 앵커 클릭으로 저장한다.
   const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
-  chrome.downloads
-    ? chrome.downloads.download({ url, filename: 'test-config.json' })
-    : window.open(url);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${config.profileName ?? 'test-config'}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 });
 
 function applyConfig(text) {

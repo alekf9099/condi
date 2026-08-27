@@ -170,7 +170,7 @@ $env:CONDI_CONFIG = "config/test-config.member.json"; npx playwright test
 
 | 잡 | 트리거 | 하는 일 |
 |---|---|---|
-| `validate` | main push, PR | `tsc --noEmit` · 확장 모듈 동기화 검사 · `config/*.json` 전 프로필 스키마 검증 · 확장 러너 테스트 8건 |
+| `validate` | main push, PR | `tsc --noEmit` · 확장 모듈 동기화 검사 · `config/*.json` 전 프로필 스키마 검증 · 테스트 37건 |
 | `auto-merge` | PR (라벨 `automerge`) | GitHub 네이티브 auto-merge를 켬 |
 
 자동 머지를 쓰려면 PR에 **`automerge` 라벨**만 붙이면 됩니다.
@@ -195,6 +195,18 @@ gh pr create --fill --label automerge
 
 Vercel을 연결한 뒤 배포 성공까지 머지 조건에 넣으려면,
 룰셋의 required status checks에 Vercel 체크를 추가하면 auto-merge가 그것까지 기다립니다.
+
+### 테스트 구성
+
+| 스펙 | 검증 대상 | 실제 타겟 필요 |
+|---|---|---|
+| `template.spec.ts` | 공유 모듈 — 치환·조건·주입 해석·스키마 검증 | 없음 |
+| `ui-runner.spec.ts` | 확장 UI 실행기 — 대기·액션·실패 메시지 | 없음 |
+| `picker.spec.ts` | 셀렉터 피커 — 생성한 셀렉터가 유일하게 해석되는지 | 없음 |
+| `extension-e2e.spec.ts` | **확장 전체 파이프라인** — 실제 Chromium에 로드해 API 세팅 → 주입 → uiFlow | 없음 (목 서버) |
+| `example-conditional-flow.spec.ts` | 실제 사이트 시나리오 템플릿 | **필요** |
+
+앞의 넷은 로컬 목 서버만 쓰므로 CI에서 항상 실행됩니다.
 
 ### 실제 타겟 테스트를 CI에서 돌리려면
 

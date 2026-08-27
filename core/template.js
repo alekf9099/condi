@@ -118,3 +118,59 @@ export const UI_ACTIONS_NEEDING_TARGET = new Set([
 
 /** 지원하는 모든 UI 액션 */
 export const UI_ACTIONS = new Set(['goto', 'waitForUrl', ...UI_ACTIONS_NEEDING_TARGET]);
+
+/**
+ * 치환을 시도하되 실패하면 실패로 보고한다 (예외를 던지지 않음).
+ * @param {unknown} input
+ * @param {Record<string, unknown>} ctx
+ * @returns {{ok: boolean, value: any}}
+ */
+export function tryResolveDeep(input, ctx) {
+  try {
+    return { ok: true, value: resolveDeep(input, ctx) };
+  } catch {
+    return { ok: false, value: undefined };
+  }
+}
+
+/**
+ * injection 규칙을 항목 단위로 치환한다.
+ *
+ * 조건부 API 스텝이 건너뛰어지면 그 스텝의 extract 변수는 존재하지 않는다.
+ * 그 변수를 참조하는 주입 항목은 **주입할 것이 없다는 뜻**이므로, 실행 전체를
+ * 실패시키지 않고 해당 항목만 떨어뜨린다. 떨어진 항목은 호출부가 보고한다.
+ *
+ * @param {any} injection
+ * @param {Record<string, unknown>} ctx
+ * @returns {{injection: any, dropped: string[]}}
+ */
+export function resolveInjection(injection, ctx) {
+  /** @type {string[]} */
+  const dropped = [];
+  /** @type {any} */
+  const out = {};
+
+  for (const key of ['localStorage', 'sessionStorage', 'extraHTTPHeaders']) {
+    if (!injection?.[key]) continue;
+    /** @type {Record<string, string>} */
+    const map = {};
+    for (const [k, v] of Object.entries(injection[key])) {
+      const r = tryResolveDeep(v, ctx);
+      if (r.ok) map[k] = r.value;
+      else dropped.push(`${key}.${k}`);
+    }
+    if (Object.keys(map).length) out[key] = map;
+  }
+
+  if (Array.isArray(injection?.cookies)) {
+    const cookies = [];
+    for (const [i, c] of injection.cookies.entries()) {
+      const r = tryResolveDeep(c, ctx);
+      if (r.ok) cookies.push(r.value);
+      else dropped.push(`cookies[${i}]${c?.name ? ` (${c.name})` : ''}`);
+    }
+    if (cookies.length) out.cookies = cookies;
+  }
+
+  return { injection: out, dropped };
+}

@@ -46,9 +46,11 @@ jobs:
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
 
-      # 확장 UI 실행기 테스트 — 로컬 픽스처만 쓰므로 실제 타겟 없이 항상 실행 가능
-      - name: Test extension UI runner
-        run: npx playwright test tests/ui-runner.spec.ts
+      # 실행기·피커·확장 전체 파이프라인 — 모두 로컬 목 서버만 쓰므로
+      # 실제 타겟 없이 CI에서 항상 실행 가능하다.
+      # (tests/example-conditional-flow.spec.ts 는 실제 타겟이 필요해 제외)
+      - name: Test engine, picker and full extension pipeline
+        run: npx playwright test tests/template.spec.ts tests/ui-runner.spec.ts tests/picker.spec.ts tests/extension-e2e.spec.ts
 
   # ── CI 통과 시 자동 머지 ──
   # GitHub 네이티브 auto-merge를 켜기만 한다. 실제 병합 시점은 GitHub가 판단하며,

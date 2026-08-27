@@ -10,7 +10,7 @@
     "resolveJsonModule": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "types": ["node"]
+    "types": ["node", "chrome"]
   },
   "include": ["core/**/*.ts", "fixtures/**/*.ts", "tests/**/*.ts", "playwright.config.ts"]
 }
