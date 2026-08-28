@@ -9,10 +9,11 @@ import * as path from 'path';
  * 여기가 틀리면 설정에 잘못된 셀렉터가 쌓여 나중에 원인 찾기가 어려워진다.
  */
 
-const PICKER = fs.readFileSync(
-  path.resolve(__dirname, '..', 'extension', 'content', 'picker.js'),
-  'utf-8',
-);
+const read = (f: string) =>
+  fs.readFileSync(path.resolve(__dirname, '..', 'extension', 'content', f), 'utf-8');
+// 셀렉터 생성 규칙은 selector.js 에 있고 picker/recorder 가 공유한다
+const SELECTOR = read('selector.js');
+const PICKER = read('picker.js');
 
 const FIXTURE = `
   <div data-testid="save-button">저장</div>
@@ -30,6 +31,7 @@ const FIXTURE = `
 
 async function setup(page: Page) {
   await page.setContent(`<!doctype html><meta charset="utf-8"><body>${FIXTURE}</body>`);
+  await page.addScriptTag({ content: SELECTOR });
   await page.addScriptTag({ content: PICKER });
 }
 

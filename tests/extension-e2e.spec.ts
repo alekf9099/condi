@@ -297,6 +297,8 @@ test.describe('패널 — 셀렉터 수집', () => {
       const target = await ctx.newPage();
       await target.goto(server.url);
 
+      await target.bringToFront();
+
       const panel = await ctx.newPage();
       await panel.goto(`chrome-extension://${extId}/panel/panel.html`);
       // 시작 시점에는 설정이 없어 실행이 막혀 있어야 한다
@@ -357,6 +359,83 @@ test.describe('패널 — 셀렉터 수집', () => {
       expect(cfg.selectors).toEqual({});
       // apiBaseUrl 없이도 유효한 설정이어야 한다
       await expect(panel.locator('#config-status')).toHaveClass(/ok/);
+    } finally {
+      await server.close();
+    }
+  });
+});
+
+
+/**
+ * 조건 매트릭스 실행.
+ *
+ * Condi 의 전제는 "조건이 바뀌면 검증도 바뀐다"이므로, 조합을 한 번에 돌려
+ * 어느 조건에서만 깨지는지 드러내는 것이 이 기능의 목적이다.
+ */
+test.describe('패널 — 조건 매트릭스', () => {
+  test('조합을 모두 실행하고 격자로 결과를 낸다', async ({ ctx, extId }) => {
+    const server = await startServer();
+    try {
+      const target = await ctx.newPage();
+      await target.goto(server.url);
+      await target.bringToFront();
+
+      const panel = await ctx.newPage();
+      await panel.goto(`chrome-extension://${extId}/panel/panel.html`);
+
+      const config = makeConfig(server.url, { userRole: 'admin', testDataCondition: 'hasActiveOrder' });
+      await panel.locator('.tab[data-tab="config"]').click();
+      await panel.locator('#config').fill(JSON.stringify(config));
+      await expect(panel.locator('#config-status')).toHaveClass(/ok/);
+
+      await panel.locator('.tab[data-tab="matrix"]').click();
+      await panel.locator('#mx-userRole').fill('admin, member');
+      await panel.locator('#mx-testDataCondition').fill('hasActiveOrder, noOrder');
+      await panel.locator('#run-matrix').click();
+
+      // 2x2 = 4개 조합이 모두 통과해야 한다
+      await expect(panel.locator('#matrix-progress')).toContainText('4개 조합', { timeout: 90_000 });
+      await expect(panel.locator('#matrix-progress')).toContainText('실패 0');
+      await expect(panel.locator('#matrix-progress')).toHaveClass(/ok/);
+
+      // 격자가 그려지고 셀이 채워졌는지
+      const cells = panel.locator('.matrix td.ok');
+      await expect(cells).toHaveCount(4);
+      // 축 라벨이 제자리에 있는지
+      await expect(panel.locator('.matrix')).toContainText('userRole');
+      await expect(panel.locator('.matrix')).toContainText('hasActiveOrder');
+    } finally {
+      await server.close();
+    }
+  });
+
+  test('실패하는 조건이 격자에서 드러난다', async ({ ctx, extId }) => {
+    const server = await startServer();
+    try {
+      const target = await ctx.newPage();
+      await target.goto(server.url);
+      await target.bringToFront();
+
+      const panel = await ctx.newPage();
+      await panel.goto(`chrome-extension://${extId}/panel/panel.html`);
+
+      // member 에서도 admin 메뉴를 요구하게 만들어 일부러 깨뜨린다
+      const config = makeConfig(server.url, { userRole: 'admin', testDataCondition: 'noOrder' });
+      config.uiFlow = [{ action: 'expectVisible', target: 'adminDashboardMenu' }] as never;
+      // 목 앱은 로그인만 되면 admin 메뉴를 항상 그리므로, 없는 요소로 실패를 만든다
+      config.selectors.adminDashboardMenu = '[data-testid="does-not-exist"]';
+      (config as Record<string, unknown>).waits = { elementTimeout: 1500 };
+
+      await panel.locator('.tab[data-tab="config"]').click();
+      await panel.locator('#config').fill(JSON.stringify(config));
+      await panel.locator('.tab[data-tab="matrix"]').click();
+      await panel.locator('#mx-userRole').fill('admin, member');
+      await panel.locator('#mx-testDataCondition').fill('noOrder');
+      await panel.locator('#run-matrix').click();
+
+      await expect(panel.locator('#matrix-progress')).toContainText('2개 조합', { timeout: 90_000 });
+      await expect(panel.locator('#matrix-progress')).toContainText('실패 2');
+      await expect(panel.locator('#matrix-progress')).toHaveClass(/err/);
     } finally {
       await server.close();
     }

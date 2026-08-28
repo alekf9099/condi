@@ -44,8 +44,120 @@ chrome.runtime.onMessage.addListener((msg) => {
   if (msg?.type === 'CONDI_PICK_CANCELLED') {
     $('pick').textContent = '요소 선택 시작';
   }
+  if (msg?.type === 'CONDI_RECORD_STEP') recordStep(msg.step, msg.preview);
+  if (msg?.type === 'CONDI_RECORD_AMEND') amendLastFill(msg.value);
+  if (msg?.type === 'CONDI_RECORD_ENDED') setRecording(false);
   return false;
 });
+
+/* ── 플로우 레코더 ── */
+let recording = false;
+
+$('record').addEventListener('click', async () => {
+  const tab = await getTargetTab();
+  if (!tab?.id) {
+    addLog('fail', '대상 탭을 찾을 수 없습니다', '검증할 웹페이지를 연 뒤 다시 시도하세요.');
+    return;
+  }
+  const next = !recording;
+  const res = await chrome.runtime.sendMessage({
+    type: 'CONDI_RECORD',
+    tabId: tab.id,
+    on: next,
+    stepCount: config?.uiFlow?.length ?? 0,
+  });
+  if (!res?.ok) {
+    addLog('fail', '녹화 시작 실패', res?.error ?? '');
+    return;
+  }
+  setRecording(next);
+});
+
+function setRecording(on) {
+  recording = on;
+  $('record').textContent = on ? '■ 녹화 중지' : '● 녹화 시작';
+  $('record').classList.toggle('is-recording', on);
+}
+
+/**
+ * 레코더가 보낸 단계를 설정에 반영한다.
+ * 셀렉터는 selectors 맵에 등록하고, uiFlow 에는 논리 이름만 남긴다.
+ */
+async function recordStep(step, preview) {
+  if (!config) config = await newSkeletonConfig();
+
+  const { selector, ...rest } = step;
+  const name = registerSelector(rest.target, selector);
+  const uiStep = { ...rest, target: name };
+  if (!uiStep.target) delete uiStep.target;
+
+  config.uiFlow = config.uiFlow ?? [];
+  config.uiFlow.push(uiStep);
+  syncConfig();
+  addLog('pass', `${uiStep.action} · ${name}`, preview ?? '');
+}
+
+/** 같은 셀렉터면 기존 이름을 재사용하고, 이름만 겹치면 새 이름을 만든다 */
+function registerSelector(suggested, selector) {
+  config.selectors = config.selectors ?? {};
+  const existing = Object.entries(config.selectors).find(([, v]) => v === selector);
+  if (existing) return existing[0];
+
+  let name = suggested || 'element';
+  let i = 2;
+  while (name in config.selectors) name = `${suggested || 'element'}${i++}`;
+  config.selectors[name] = selector;
+  return name;
+}
+
+/** 한 필드에 이어 타이핑한 경우 마지막 fill 단계의 값만 갱신한다 */
+function amendLastFill(value) {
+  const last = config?.uiFlow?.[config.uiFlow.length - 1];
+  if (last?.action !== 'fill') return;
+  last.value = value;
+  syncConfig();
+}
+
+$('clear-flow').addEventListener('click', () => {
+  if (!config) return;
+  config.uiFlow = [];
+  syncConfig();
+});
+
+/** 설정 변경을 textarea·저장소·검증·목록에 한꺼번에 반영한다 */
+function syncConfig() {
+  const text = JSON.stringify(config, null, 2);
+  applyConfig(text);
+  $('config').value = text;
+}
+
+function renderFlow() {
+  const list = $('flow-list');
+  const steps = config?.uiFlow ?? [];
+  $('flow-count').textContent = `${steps.length}단계`;
+  $('clear-flow').disabled = !steps.length;
+  list.innerHTML = '';
+  if (!steps.length) {
+    list.innerHTML = '<li class="empty">녹화하거나 설정에서 직접 추가하세요.</li>';
+    return;
+  }
+  for (const step of steps) {
+    const li = document.createElement('li');
+    const a = document.createElement('span');
+    a.className = 'act';
+    a.textContent = step.action;
+    li.appendChild(a);
+    const t = document.createElement('span');
+    t.textContent = [step.target, step.value].filter(Boolean).join(' · ');
+    li.appendChild(t);
+    if (step.when) {
+      const w = document.createElement('em');
+      w.textContent = Object.entries(step.when).map(([k, v]) => `${k.split('.').pop()}=${v}`).join(', ');
+      li.appendChild(w);
+    }
+    list.appendChild(li);
+  }
+}
 
 /* ── 설정 로드/저장 ── */
 const stored = await chrome.storage.local.get(STORAGE_KEY);
@@ -121,11 +233,15 @@ function applyConfig(text) {
   $('target').textContent = `${config.profileName ?? ''} · ${config.target.baseUrl}`;
   renderConditions();
   renderSelectors();
+  renderFlow();
+  renderMatrixFields();
   setReady(true);
 }
 
 function setReady(ready) {
   $('run').disabled = !ready;
+  $('record').disabled = !ready && !config;
+  $('run-matrix').disabled = !ready;
 }
 
 /* ── 조건 오버라이드 ── */
@@ -317,4 +433,149 @@ function renderSelectors() {
     li.append(n, c);
     list.appendChild(li);
   }
+}
+
+/* ── 조건 매트릭스 실행 ──
+   Condi의 전제는 "조건이 바뀌면 검증도 바뀐다"인데, 지금까지는 한 조건씩만 돌 수 있었다.
+   여기서는 조건값의 모든 조합을 차례로 실행하고 결과를 격자로 보여준다. */
+
+function renderMatrixFields() {
+  const box = $('matrix-fields');
+  box.innerHTML = '';
+  const entries = Object.entries(config?.conditions ?? {});
+  if (!entries.length) {
+    box.innerHTML = '<p class="empty">조건이 정의되지 않았습니다.</p>';
+    return;
+  }
+  for (const [key, value] of entries) {
+    const wrap = document.createElement('div');
+    wrap.className = 'field';
+    const label = document.createElement('label');
+    label.textContent = key;
+    label.htmlFor = `mx-${key}`;
+    const input = document.createElement('input');
+    input.id = `mx-${key}`;
+    input.dataset.key = key;
+    input.value = String(value);
+    input.placeholder = 'admin, member';
+    wrap.append(label, input);
+    box.appendChild(wrap);
+  }
+}
+
+/** 입력된 값들로 조건 조합(데카르트 곱)을 만든다 */
+function buildCombinations() {
+  const axes = [...$('matrix-fields').querySelectorAll('input')].map((input) => ({
+    key: input.dataset.key,
+    values: input.value
+      .split(',')
+      .map((v) => v.trim())
+      .filter(Boolean)
+      .map((v) => coerce(v, config.conditions[input.dataset.key])),
+  }));
+
+  let combos = [{}];
+  for (const axis of axes) {
+    if (!axis.values.length) continue;
+    combos = combos.flatMap((c) => axis.values.map((v) => ({ ...c, [axis.key]: v })));
+  }
+  return { combos, varied: axes.filter((a) => a.values.length > 1) };
+}
+
+$('run-matrix').addEventListener('click', async () => {
+  if (!config) return;
+  const tab = await getTargetTab();
+  if (!tab?.id) {
+    $('matrix-progress').className = 'status err';
+    $('matrix-progress').textContent = '대상 탭을 찾을 수 없습니다. 검증할 웹페이지를 연 뒤 다시 실행하세요.';
+    return;
+  }
+
+  const { combos, varied } = buildCombinations();
+  const btn = $('run-matrix');
+  btn.disabled = true;
+  $('matrix-result').innerHTML = '';
+
+  const results = [];
+  const original = config.conditions;
+  try {
+    for (const [i, conditions] of combos.entries()) {
+      $('matrix-progress').className = 'status';
+      $('matrix-progress').textContent = `${i + 1}/${combos.length} 실행 중 — ${describeCombo(conditions)}`;
+
+      const res = await chrome.runtime.sendMessage({
+        type: 'CONDI_RUN',
+        config: { ...config, conditions },
+        tabId: tab.id,
+      });
+
+      const steps = res?.result?.steps ?? [];
+      results.push({
+        conditions,
+        ok: Boolean(res?.ok) && steps.every((s) => s.ok),
+        passed: steps.filter((s) => s.ok).length,
+        total: steps.length,
+        error: res?.ok ? null : res?.error,
+      });
+    }
+  } finally {
+    config.conditions = original;
+    btn.disabled = false;
+  }
+
+  const failed = results.filter((r) => !r.ok).length;
+  $('matrix-progress').className = failed ? 'status err' : 'status ok';
+  $('matrix-progress').textContent = `${results.length}개 조합 · 통과 ${results.length - failed} · 실패 ${failed}`;
+  renderMatrixResult(results, varied);
+});
+
+const describeCombo = (c) => Object.entries(c).map(([k, v]) => `${k}=${v}`).join(' · ');
+
+function renderMatrixResult(results, varied) {
+  const box = $('matrix-result');
+  box.innerHTML = '';
+
+  // 두 축이 변할 때만 격자가 의미 있다. 그 외에는 목록으로 보여준다.
+  if (varied.length === 2) {
+    const [rowAxis, colAxis] = varied;
+    const table = document.createElement('table');
+    table.className = 'matrix';
+
+    const head = table.insertRow();
+    head.insertCell().textContent = `${rowAxis.key} \ ${colAxis.key}`;
+    for (const col of colAxis.values) head.insertCell().textContent = String(col);
+
+    for (const row of rowAxis.values) {
+      const tr = table.insertRow();
+      tr.insertCell().textContent = String(row);
+      for (const col of colAxis.values) {
+        const r = results.find(
+          (x) => x.conditions[rowAxis.key] === row && x.conditions[colAxis.key] === col,
+        );
+        const cell = tr.insertCell();
+        cell.className = r?.ok ? 'ok' : 'ng';
+        cell.textContent = r ? `${r.ok ? '✓' : '✕'} ${r.passed}/${r.total}` : '–';
+        if (r?.error) cell.title = r.error;
+      }
+    }
+    box.appendChild(table);
+    return;
+  }
+
+  const list = document.createElement('ol');
+  list.className = 'log';
+  for (const r of results) {
+    const li = document.createElement('li');
+    li.className = r.ok ? 'pass' : 'fail';
+    const n = document.createElement('span');
+    n.className = 'name';
+    n.textContent = describeCombo(r.conditions);
+    li.appendChild(n);
+    const d = document.createElement('span');
+    d.className = 'detail';
+    d.textContent = r.error ?? `${r.passed}/${r.total} 단계 통과`;
+    li.appendChild(d);
+    list.appendChild(li);
+  }
+  box.appendChild(list);
 }

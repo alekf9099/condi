@@ -7,3 +7,37 @@
   border-radius: 3px;
   transition: all 60ms ease-out;
 }
+
+/* ── 레코더 상태 막대 ── */
+.condi-rec-bar {
+  position: fixed;
+  z-index: 2147483647;
+  top: 12px;
+  right: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-radius: 10px;
+  background: #17171f;
+  border: 1px solid #4f46e5;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
+  font: 12px/1.4 ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+  color: #e9e9f2;
+}
+.condi-rec-bar.is-assert { border-color: #ff5c8a; }
+.condi-rec-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: #ff5c8a; box-shadow: 0 0 8px #ff5c8a;
+  animation: condi-rec-pulse 1.4s ease-in-out infinite;
+}
+@keyframes condi-rec-pulse { 50% { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) { .condi-rec-dot { animation: none; } }
+.condi-rec-label { font-weight: 600; }
+.condi-rec-count { color: #9a9aab; font-family: ui-monospace, monospace; font-size: 11px; }
+.condi-rec-bar button {
+  font: inherit; font-size: 11px; cursor: pointer;
+  padding: 3px 8px; border-radius: 6px;
+  border: 1px solid #2a2a36; background: #0f0f14; color: #e9e9f2;
+}
+.condi-rec-bar button:hover { border-color: #8b85f5; }

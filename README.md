@@ -71,13 +71,30 @@ ZIP을 받아 압축을 풀고, `chrome://extensions` → **개발자 모드** �
 안정적인 셀렉터(`data-testid` > `id` > `name` > `aria-label` > 최단 CSS 경로)가
 자동 생성되어 설정의 `selectors`에 추가됩니다. <kbd>Esc</kbd>로 취소합니다.
 
-**실행 탭** — 조건을 즉석에서 바꿔 실행합니다. 실행 순서는 Playwright 러너와 동일합니다:
+**실행 탭** — `● 녹화 시작`을 누르고 평소처럼 사이트를 조작하면, 클릭·입력·선택·체크가
+`uiFlow` 단계로 쌓입니다. 페이지에 뜨는 막대에서 **검증 추가**로 바꾸면 클릭한 요소가
+`expectVisible`/`expectText` 검증으로 남습니다. <kbd>Esc</kbd>로 중지합니다.
+셀렉터는 피커와 같은 규칙으로 뽑히므로 한 설정 안에서 이름이 어긋나지 않습니다.
+
+조건을 즉석에서 바꿔 실행합니다. 실행 순서는 Playwright 러너와 동일합니다:
 
 ```
 apiSetup 실행 → 쿠키·헤더 주입 → baseUrl 이동 → 스토리지 주입 후 재로드 → uiFlow 실행
 ```
 
 단계별 통과/실패가 패널에 쌓이고, 실패하면 무엇을 기다렸는지가 함께 표시됩니다.
+
+**매트릭스 탭** — 조건마다 시험할 값을 쉼표로 나눠 적으면 **모든 조합을 차례로 실행**하고
+결과를 격자로 보여줍니다.
+
+|  | hasActiveOrder | noOrder |
+|---|---|---|
+| **admin** | ✓ 3/3 | ✓ 2/2 |
+| **member** | ✓ 3/3 | ✕ 1/2 |
+
+"member + noOrder에서만 깨진다"가 한눈에 드러납니다.
+조합 사이에 `injection`이 선언한 스토리지 키는 매번 덮어쓰거나 지워지므로,
+앞 조합이 남긴 상태가 다음 조합을 오염시키지 않습니다.
 
 ### 확장의 제약
 
@@ -175,7 +192,7 @@ $env:CONDI_CONFIG = "config/test-config.member.json"; npx playwright test
 
 | 잡 | 트리거 | 하는 일 |
 |---|---|---|
-| `validate` | main push, PR | `tsc --noEmit` · 확장 모듈 동기화 검사 · `config/*.json` 전 프로필 스키마 검증 · 테스트 42건 |
+| `validate` | main push, PR | `tsc --noEmit` · 확장 모듈 동기화 검사 · `config/*.json` 전 프로필 스키마 검증 · 테스트 52건 |
 | `auto-merge` | PR (라벨 `automerge`) | GitHub 네이티브 auto-merge를 켬 |
 
 자동 머지를 쓰려면 PR에 **`automerge` 라벨**만 붙이면 됩니다.
@@ -208,10 +225,11 @@ Vercel을 연결한 뒤 배포 성공까지 머지 조건에 넣으려면,
 | `template.spec.ts` | 공유 모듈 — 치환·조건·주입 해석·스키마 검증 | 없음 |
 | `ui-runner.spec.ts` | 확장 UI 실행기 — 대기·액션·실패 메시지 | 없음 |
 | `picker.spec.ts` | 셀렉터 피커 — 생성한 셀렉터가 유일하게 해석되는지 | 없음 |
-| `extension-e2e.spec.ts` | **확장 전체 파이프라인 + 패널 UI** — 실제 Chromium에 로드해 API 세팅 → 주입 → uiFlow, 셀렉터 수집 동선 | 없음 (목 서버) |
+| `recorder.spec.ts` | 플로우 레코더 — 조작이 올바른 uiFlow 단계로 남는지 | 없음 |
+| `extension-e2e.spec.ts` | **확장 전체 파이프라인 + 패널 UI + 매트릭스** — 실제 Chromium에 로드해 API 세팅 → 주입 → uiFlow, 셀렉터 수집·조건 매트릭스 | 없음 (목 서버) |
 | `example-conditional-flow.spec.ts` | 실제 사이트 시나리오 템플릿 | **필요** |
 
-앞의 넷은 로컬 목 서버만 쓰므로 CI에서 항상 실행됩니다.
+앞의 다섯은 로컬 목 서버만 쓰므로 CI에서 항상 실행됩니다.
 
 ### 실제 타겟 테스트를 CI에서 돌리려면
 

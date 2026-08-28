@@ -30,6 +30,12 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       .catch((err) => sendResponse({ ok: false, error: String(err?.message ?? err) }));
     return true;
   }
+  if (msg?.type === 'CONDI_RECORD') {
+    toggleRecorder(msg.tabId, msg.on, msg.stepCount)
+      .then(() => sendResponse({ ok: true }))
+      .catch((err) => sendResponse({ ok: false, error: String(err?.message ?? err) }));
+    return true;
+  }
   return false;
 });
 
@@ -80,18 +86,36 @@ async function run(config, tabId) {
   // ── 3. 이동 + 스토리지 주입 + 재로드 ──
   await navigate(tabId, config.target.baseUrl, config.waits?.navigationTimeout ?? 30000);
 
-  if (injection?.localStorage || injection?.sessionStorage) {
+  // 선언된 키는 이 실행의 결과로 '덮어써야' 한다. 값이 없어 떨어진 키를 그냥 두면
+  // 직전 실행(특히 매트릭스의 앞 조합)이 남긴 값이 살아남아 오탐을 만든다.
+  const declaredLs = Object.keys(config.injection?.localStorage ?? {});
+  const declaredSs = Object.keys(config.injection?.sessionStorage ?? {});
+  if (declaredLs.length || declaredSs.length) {
+    const setLs = injection?.localStorage ?? {};
+    const setSs = injection?.sessionStorage ?? {};
+    const clearLs = declaredLs.filter((k) => !(k in setLs));
+    const clearSs = declaredSs.filter((k) => !(k in setSs));
+
     await chrome.scripting.executeScript({
       target: { tabId },
-      func: (ls, ss) => {
-        for (const [k, v] of Object.entries(ls ?? {})) localStorage.setItem(k, v);
-        for (const [k, v] of Object.entries(ss ?? {})) sessionStorage.setItem(k, v);
+      func: (ls, ss, delLs, delSs) => {
+        for (const k of delLs) localStorage.removeItem(k);
+        for (const k of delSs) sessionStorage.removeItem(k);
+        for (const [k, v] of Object.entries(ls)) localStorage.setItem(k, v);
+        for (const [k, v] of Object.entries(ss)) sessionStorage.setItem(k, v);
       },
-      args: [injection.localStorage ?? {}, injection.sessionStorage ?? {}],
+      args: [setLs, setSs, clearLs, clearSs],
     });
     // 앱이 스토리지를 읽도록 다시 로드
     await navigate(tabId, null, config.waits?.navigationTimeout ?? 30000);
-    emit({ phase: 'inject', status: 'pass', name: '스토리지 주입', detail: '주입 후 재로드 완료' });
+    emit({
+      phase: 'inject',
+      status: 'pass',
+      name: '스토리지 주입',
+      detail: clearLs.length || clearSs.length
+        ? `주입 후 재로드 · 이전 값 제거: ${[...clearLs, ...clearSs].join(', ')}`
+        : '주입 후 재로드 완료',
+    });
   }
 
   // ── 4. UI 흐름 실행 ──
@@ -257,6 +281,24 @@ function stripHash(url) {
 
 async function startPicker(tabId) {
   await chrome.scripting.insertCSS({ target: { tabId }, files: ['content/picker.css'] });
-  await chrome.scripting.executeScript({ target: { tabId }, files: ['content/picker.js'] });
+  // selector.js 를 먼저 넣어야 picker/recorder 가 같은 규칙을 공유한다
+  await chrome.scripting.executeScript({
+    target: { tabId },
+    files: ['content/selector.js', 'content/picker.js'],
+  });
   await chrome.tabs.sendMessage(tabId, { type: 'CONDI_START_PICK' });
+}
+
+/** 플로우 레코더 켜기/끄기 */
+async function toggleRecorder(tabId, on, stepCount) {
+  if (!on) {
+    await chrome.tabs.sendMessage(tabId, { type: 'CONDI_RECORD_STOP' }).catch(() => {});
+    return;
+  }
+  await chrome.scripting.insertCSS({ target: { tabId }, files: ['content/picker.css'] });
+  await chrome.scripting.executeScript({
+    target: { tabId },
+    files: ['content/selector.js', 'content/recorder.js'],
+  });
+  await chrome.tabs.sendMessage(tabId, { type: 'CONDI_RECORD_START', stepCount: stepCount ?? 0 });
 }
