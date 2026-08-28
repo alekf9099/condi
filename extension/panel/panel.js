@@ -377,10 +377,22 @@ async function addPickedSelector(selector, suggestedName, preview) {
   while (name in config.selectors && config.selectors[name] !== selector) name = `${suggestedName}${i++}`;
 
   config.selectors[name] = selector;
+
+  // 요소를 고르는 행위의 의도는 대개 "이게 보여야 한다"이다.
+  // 셀렉터만 담고 끝내면 실행해도 아무 일이 없어, 고른 의미가 사라진다.
+  // 동작(클릭·입력)은 녹화가 담당하고, 여기서는 검증 단계를 만든다.
+  config.uiFlow = config.uiFlow ?? [];
+  config.uiFlow.push({ action: 'expectVisible', target: name });
+
   // applyConfig 를 거쳐야 검증 상태·실행 버튼·목록이 한꺼번에 갱신된다.
   applyConfig(JSON.stringify(config, null, 2));
   $('config').value = JSON.stringify(config, null, 2);
-  addLog('pass', `셀렉터 추가: ${name}`, `${selector}${preview ? ` — "${preview}"` : ''}`);
+  addLog(
+    'pass',
+    `셀렉터 추가: ${name}`,
+    `${selector}${preview ? ` — "${preview}"` : ''}
+→ '보임' 검증 단계로 추가됨 (${config.uiFlow.length}단계)`,
+  );
 }
 
 
@@ -406,12 +418,14 @@ async function getTargetTab() {
 /** 현재 탭을 기준으로 최소 설정을 만든다 */
 async function newSkeletonConfig() {
   const tab = await getTargetTab();
-  let origin = 'https://example.com';
+  let baseUrl = 'https://example.com/';
   let host = 'new-profile';
   try {
     if (tab?.url) {
       const u = new URL(tab.url);
-      origin = u.origin;
+      // 사이트 루트가 아니라 '지금 보고 있는 페이지'를 타겟으로 잡아야 한다.
+      // 루트로 잡으면 실행할 때마다 요소를 고른 화면을 떠나 버린다.
+      baseUrl = u.origin + u.pathname;
       host = u.hostname;
     }
   } catch {
@@ -419,7 +433,7 @@ async function newSkeletonConfig() {
   }
   return {
     profileName: host,
-    target: { baseUrl: `${origin}/` },
+    target: { baseUrl },
     conditions: { userRole: 'default' },
     selectors: {},
     uiFlow: [],
