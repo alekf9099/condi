@@ -78,3 +78,33 @@ textarea { width: 100%; min-height: 380px; background: var(--code); color: var(-
 kbd { background: var(--code); border: 1px solid var(--border); border-radius: 3px;
       padding: 0 .25rem; font-size: .72rem; font-family: ui-monospace, monospace; }
 .empty { color: var(--muted); font-size: .78rem; font-style: italic; }
+
+/* ── UI 흐름 목록 ── */
+.flow { margin-bottom: 1rem; }
+.flow-list { list-style: none; margin: .5rem 0 0; padding: 0; max-height: 180px; overflow-y: auto; }
+.flow-list li {
+  display: flex; align-items: baseline; gap: .4rem; flex-wrap: wrap;
+  padding: .3rem 0; border-bottom: 1px solid var(--border); font-size: .78rem;
+}
+.flow-list .act {
+  font-family: ui-monospace, monospace; font-size: .72rem;
+  color: var(--accent); background: var(--code);
+  padding: .05rem .35rem; border-radius: 4px; flex-shrink: 0;
+}
+.flow-list em {
+  font-style: normal; font-size: .68rem; color: var(--muted);
+  border: 1px solid var(--border); border-radius: 4px; padding: 0 .3rem;
+}
+#record.is-recording { border-color: var(--fail); color: var(--fail); font-weight: 600; }
+
+/* ── 매트릭스 결과 ── */
+.matrix { width: 100%; border-collapse: collapse; margin-top: .8rem; font-size: .78rem; }
+.matrix td {
+  border: 1px solid var(--border); padding: .35rem .5rem; text-align: center;
+  font-family: ui-monospace, monospace;
+}
+.matrix tr:first-child td, .matrix td:first-child {
+  background: var(--code); color: var(--muted); font-weight: 600; text-align: left;
+}
+.matrix td.ok { color: var(--pass); }
+.matrix td.ng { color: var(--fail); font-weight: 700; }

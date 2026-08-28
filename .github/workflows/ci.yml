@@ -54,7 +54,7 @@ jobs:
       # 실제 타겟 없이 CI에서 항상 실행 가능하다.
       # (tests/example-conditional-flow.spec.ts 는 실제 타겟이 필요해 제외)
       - name: Test engine, picker and full extension pipeline
-        run: npx playwright test tests/template.spec.ts tests/ui-runner.spec.ts tests/picker.spec.ts tests/extension-e2e.spec.ts
+        run: npx playwright test tests/template.spec.ts tests/ui-runner.spec.ts tests/picker.spec.ts tests/recorder.spec.ts tests/extension-e2e.spec.ts
 
   # ── CI 통과 시 자동 머지 ──
   # GitHub 네이티브 auto-merge를 켜기만 한다. 실제 병합 시점은 GitHub가 판단하며,
