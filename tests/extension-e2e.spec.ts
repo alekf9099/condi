@@ -363,6 +363,57 @@ test.describe('패널 — 셀렉터 수집', () => {
       await server.close();
     }
   });
+
+  test('셀렉터만 모으고 실행하면 아무 일도 안 했다고 분명히 알린다', async ({ ctx, extId, sw }) => {
+    const server = await startServer();
+    try {
+      const target = await ctx.newPage();
+      await target.goto(server.url);
+      await target.bringToFront();
+
+      const panel = await ctx.newPage();
+      await panel.goto(`chrome-extension://${extId}/panel/panel.html`);
+      await sendPick(sw, '[data-testid="welcome-banner"]', 'welcomeBanner');
+      await expect(panel.locator('#run')).toBeEnabled();
+
+      await panel.locator('#run').click();
+
+      // '완료'처럼 보여서 성공으로 오해하면 안 된다
+      await expect(panel.locator('#log li.skip')).toContainText('실행할 UI 단계가 없습니다', {
+        timeout: 30_000,
+      });
+      await expect(panel.locator('#flow-count')).toHaveText('0단계');
+    } finally {
+      await server.close();
+    }
+  });
+
+  test('셀렉터 옆 버튼으로 흐름 단계를 만들면 실행된다', async ({ ctx, extId, sw }) => {
+    const server = await startServer();
+    try {
+      const target = await ctx.newPage();
+      await target.goto(server.url);
+      await target.bringToFront();
+
+      const panel = await ctx.newPage();
+      await panel.goto(`chrome-extension://${extId}/panel/panel.html`);
+      // 토큰이 없는 상태의 목 앱에는 로그인 입력만 있다 (항상 보이는 요소)
+      await sendPick(sw, '#email', 'emailInput');
+
+      // 셀렉터 탭에서 '보임' 단계를 추가
+      await panel.locator('.tab[data-tab="selectors"]').click();
+      await panel.locator('.sel-actions button[data-action="expectVisible"]').click();
+      await expect(panel.locator('#flow-count')).toHaveText('1단계');
+
+      await panel.locator('.tab[data-tab="run"]').click();
+      await panel.locator('#run').click();
+
+      await expect(panel.locator('#summary')).toContainText('통과 1', { timeout: 30_000 });
+      await expect(panel.locator('#summary')).toContainText('실패 0');
+    } finally {
+      await server.close();
+    }
+  });
 });
 
 

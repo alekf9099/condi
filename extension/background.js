@@ -120,7 +120,13 @@ async function run(config, tabId) {
 
   // ── 4. UI 흐름 실행 ──
   if (!config.uiFlow?.length) {
-    emit({ phase: 'done', passed: 0, failed: 0, detail: 'uiFlow가 비어 있어 UI 단계를 건너뜁니다' });
+    emit({
+      phase: 'done',
+      status: 'empty',
+      passed: 0,
+      failed: 0,
+      detail: '셀렉터 탭에서 단계를 추가하거나 녹화로 흐름을 만든 뒤 다시 실행하세요.',
+    });
     return { vars, steps: [] };
   }
 
