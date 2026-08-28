@@ -59,10 +59,15 @@ ZIP을 받아 압축을 풀고, `chrome://extensions` → **개발자 모드** �
 
 ### 사용법
 
-**설정 탭** — `config/test-config.json` 을 파일에서 불러오거나 JSON을 붙여넣습니다.
+**설정 탭** — `새 설정`을 누르면 현재 탭을 기준으로 최소 설정이 만들어집니다.
+파일에서 불러오거나 JSON을 직접 붙여넣어도 됩니다.
 유효성 검사가 실시간으로 돌고, 설정은 브라우저에 저장돼 다음에도 유지됩니다.
 
-**셀렉터 탭** — `요소 선택 시작`을 누르고 대상 페이지에서 요소를 클릭하면
+`apiBaseUrl` 은 **API 선행 세팅을 쓸 때만** 필요합니다. 이미 로그인된 세션을 그대로
+검증할 거라면 `baseUrl` 하나로 충분합니다.
+
+**셀렉터 탭** — 설정이 아직 없어도 됩니다. 고른 셀렉터를 담을 설정이 없으면
+현재 탭을 기준으로 자동 생성됩니다. `요소 선택 시작`을 누르고 대상 페이지에서 요소를 클릭하면
 안정적인 셀렉터(`data-testid` > `id` > `name` > `aria-label` > 최단 CSS 경로)가
 자동 생성되어 설정의 `selectors`에 추가됩니다. <kbd>Esc</kbd>로 취소합니다.
 
@@ -170,7 +175,7 @@ $env:CONDI_CONFIG = "config/test-config.member.json"; npx playwright test
 
 | 잡 | 트리거 | 하는 일 |
 |---|---|---|
-| `validate` | main push, PR | `tsc --noEmit` · 확장 모듈 동기화 검사 · `config/*.json` 전 프로필 스키마 검증 · 테스트 37건 |
+| `validate` | main push, PR | `tsc --noEmit` · 확장 모듈 동기화 검사 · `config/*.json` 전 프로필 스키마 검증 · 테스트 42건 |
 | `auto-merge` | PR (라벨 `automerge`) | GitHub 네이티브 auto-merge를 켬 |
 
 자동 머지를 쓰려면 PR에 **`automerge` 라벨**만 붙이면 됩니다.
@@ -203,7 +208,7 @@ Vercel을 연결한 뒤 배포 성공까지 머지 조건에 넣으려면,
 | `template.spec.ts` | 공유 모듈 — 치환·조건·주입 해석·스키마 검증 | 없음 |
 | `ui-runner.spec.ts` | 확장 UI 실행기 — 대기·액션·실패 메시지 | 없음 |
 | `picker.spec.ts` | 셀렉터 피커 — 생성한 셀렉터가 유일하게 해석되는지 | 없음 |
-| `extension-e2e.spec.ts` | **확장 전체 파이프라인** — 실제 Chromium에 로드해 API 세팅 → 주입 → uiFlow | 없음 (목 서버) |
+| `extension-e2e.spec.ts` | **확장 전체 파이프라인 + 패널 UI** — 실제 Chromium에 로드해 API 세팅 → 주입 → uiFlow, 셀렉터 수집 동선 | 없음 (목 서버) |
 | `example-conditional-flow.spec.ts` | 실제 사이트 시나리오 템플릿 | **필요** |
 
 앞의 넷은 로컬 목 서버만 쓰므로 CI에서 항상 실행됩니다.
