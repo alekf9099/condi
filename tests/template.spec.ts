@@ -115,7 +115,7 @@ test.describe('resolveInjection', () => {
 
 test.describe('validateConfig', () => {
   const base = {
-    target: { baseUrl: 'https://x.test', apiBaseUrl: 'https://api.x.test' },
+    target: { baseUrl: 'https://x.test' },
     conditions: {},
     selectors: { ok: '#ok' },
   };
@@ -124,9 +124,22 @@ test.describe('validateConfig', () => {
     expect(validateConfig({ ...base, uiFlow: [{ action: 'expectVisible', target: 'ok' }] })).toEqual([]);
   });
 
+  test('apiSetup이 없으면 apiBaseUrl 없이도 유효하다', () => {
+    // 확장으로 이미 로그인된 세션을 검증할 때는 baseUrl 하나면 충분해야 한다
+    expect(validateConfig(base)).toEqual([]);
+  });
+
+  test('apiSetup.steps가 있으면 apiBaseUrl을 요구한다', () => {
+    const problems = validateConfig({
+      ...base,
+      apiSetup: { steps: [{ name: 'login', request: { method: 'POST', path: '/x' } }] },
+    });
+    expect(problems.join()).toContain('apiBaseUrl');
+  });
+
   test('필수 항목 누락을 모두 모아 보고한다', () => {
     const problems = validateConfig({});
-    expect(problems.length).toBeGreaterThanOrEqual(4);
+    expect(problems.length).toBeGreaterThanOrEqual(3);
     expect(problems.join()).toContain('target.baseUrl');
   });
 

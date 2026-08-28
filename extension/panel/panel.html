@@ -38,6 +38,7 @@
   <section id="panel-config" class="pane">
     <div class="row">
       <input type="file" id="file" accept=".json" hidden>
+      <button id="new-config">새 설정</button>
       <button id="load-file">파일에서 불러오기</button>
       <button id="format">정렬</button>
       <button id="download">내보내기</button>
@@ -48,7 +49,7 @@
 
   <!-- 셀렉터 탭 -->
   <section id="panel-selectors" class="pane">
-    <p class="hint">페이지에서 요소를 클릭하면 셀렉터가 설정에 추가됩니다. <kbd>Esc</kbd>로 취소합니다.</p>
+    <p class="hint">페이지에서 요소를 클릭하면 셀렉터가 설정에 추가됩니다. <kbd>Esc</kbd>로 취소합니다.<br>설정이 없으면 현재 탭을 기준으로 자동 생성됩니다.</p>
     <button id="pick" class="primary">요소 선택 시작</button>
     <ul id="selector-list" class="selectors"><li class="empty">설정에 셀렉터가 없습니다.</li></ul>
   </section>

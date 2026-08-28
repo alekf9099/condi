@@ -87,7 +87,11 @@ export function validateConfig(config) {
   const problems = [];
   if (!config || typeof config !== 'object') return ['설정이 객체가 아닙니다'];
   if (!config.target?.baseUrl) problems.push('target.baseUrl 누락');
-  if (!config.target?.apiBaseUrl) problems.push('target.apiBaseUrl 누락');
+  // apiBaseUrl 은 API 선행 세팅을 실제로 쓸 때만 필요하다.
+  // 확장으로 이미 로그인된 세션을 그대로 검증하는 경우에는 baseUrl 하나면 충분하다.
+  if (config.apiSetup?.steps?.length && !config.target?.apiBaseUrl) {
+    problems.push('apiSetup.steps 가 있으면 target.apiBaseUrl 이 필요합니다');
+  }
   if (!config.conditions) problems.push('conditions 누락');
   if (!config.selectors) problems.push('selectors 누락');
 

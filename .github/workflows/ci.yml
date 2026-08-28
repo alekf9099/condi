@@ -5,6 +5,10 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+    # 기본값은 [opened, synchronize, reopened] 라 labeled 가 빠진다.
+    # 라벨은 PR 생성 직후 붙으므로 opened 시점엔 아직 없을 수 있고,
+    # labeled 가 없으면 auto-merge 잡을 다시 평가할 기회가 사라진다.
+    types: [opened, synchronize, reopened, labeled, ready_for_review]
 
 permissions:
   contents: read

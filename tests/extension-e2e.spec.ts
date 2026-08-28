@@ -85,7 +85,7 @@ function startServer(): Promise<MockServer> {
   });
 }
 
-const test = base.extend<{ ctx: BrowserContext; extId: string }>({
+const test = base.extend<{ ctx: BrowserContext; extId: string; sw: Worker }>({
   ctx: async ({}, use) => {
     const context = await chromium.launchPersistentContext('', {
       channel: 'chromium',
@@ -94,9 +94,12 @@ const test = base.extend<{ ctx: BrowserContext; extId: string }>({
     await use(context);
     await context.close();
   },
-  extId: async ({ ctx }, use) => {
+  sw: async ({ ctx }, use) => {
     let [sw] = ctx.serviceWorkers();
     if (!sw) sw = (await ctx.waitForEvent('serviceworker', { timeout: 15_000 })) as Worker;
+    await use(sw);
+  },
+  extId: async ({ sw }, use) => {
     await use(new URL(sw.url()).host);
   },
 });
@@ -260,6 +263,100 @@ test.describe('확장 전체 파이프라인', () => {
       expect(result.ok, JSON.stringify(result)).toBe(true);
       const steps = result.result.steps;
       expect(steps.every((s: { ok: boolean }) => s.ok), JSON.stringify(steps)).toBe(true);
+    } finally {
+      await server.close();
+    }
+  });
+});
+
+
+/**
+ * 패널 UI 회귀 테스트.
+ *
+ * 실사용에서 "셀렉터를 골랐는데 설정에 안 들어가 실행할 수 없다"는 막힘이 있었다.
+ * 원인은 두 가지가 겹친 것이었다.
+ *   1) apiBaseUrl 을 무조건 필수로 검사해 최소 설정이 늘 검증 실패
+ *   2) 검증 실패로 config 가 null 이면 피커 결과를 조용히 버림
+ * 피커는 설정을 '만드는' 도구이므로 설정이 없어도 동작해야 한다.
+ */
+test.describe('패널 — 셀렉터 수집', () => {
+  /** 서비스 워커에서 패널로 피커 결과를 보낸다 (패널은 자기 메시지를 못 받는다) */
+  const sendPick = (sw: Worker, selector: string, name: string) =>
+    sw.evaluate(
+      ({ selector, name }) =>
+        chrome.runtime
+          .sendMessage({ type: 'CONDI_PICK_RESULT', selector, suggestedName: name, preview: '' })
+          // 응답하는 리스너가 없으면 거부되지만, 여기서는 응답이 필요 없다
+          .catch(() => {}),
+      { selector, name },
+    );
+
+  test('설정이 없어도 고른 셀렉터가 설정에 들어가고 실행이 가능해진다', async ({ ctx, extId, sw }) => {
+    const server = await startServer();
+    try {
+      const target = await ctx.newPage();
+      await target.goto(server.url);
+
+      const panel = await ctx.newPage();
+      await panel.goto(`chrome-extension://${extId}/panel/panel.html`);
+      // 시작 시점에는 설정이 없어 실행이 막혀 있어야 한다
+      await expect(panel.locator('#run')).toBeDisabled();
+
+      await sendPick(sw, '[data-testid="welcome-banner"]', 'welcomeBanner');
+
+      // 셀렉터가 설정에 실제로 반영되고
+      await expect(panel.locator('#config')).toHaveValue(/welcomeBanner/);
+      await expect(panel.locator('#selector-list')).toContainText('welcomeBanner');
+      // 실행 가능 상태가 된다
+      await expect(panel.locator('#run')).toBeEnabled();
+
+      // 자동 생성된 설정의 타겟이 현재 탭 기준인지
+      const cfg = JSON.parse(await panel.locator('#config').inputValue());
+      expect(cfg.target.baseUrl).toContain('127.0.0.1');
+      expect(cfg.selectors.welcomeBanner).toBe('[data-testid="welcome-banner"]');
+    } finally {
+      await server.close();
+    }
+  });
+
+  test('이름이 겹치면 덮어쓰지 않고 새 이름을 붙인다', async ({ ctx, extId, sw }) => {
+    const server = await startServer();
+    try {
+      const target = await ctx.newPage();
+      await target.goto(server.url);
+      const panel = await ctx.newPage();
+      await panel.goto(`chrome-extension://${extId}/panel/panel.html`);
+
+      await sendPick(sw, '#first', 'item');
+      await expect(panel.locator('#config')).toHaveValue(/#first/);
+      await sendPick(sw, '#second', 'item');
+      await expect(panel.locator('#config')).toHaveValue(/#second/);
+
+      const cfg = JSON.parse(await panel.locator('#config').inputValue());
+      expect(cfg.selectors.item).toBe('#first');
+      expect(Object.values(cfg.selectors)).toContain('#second');
+      expect(Object.keys(cfg.selectors)).toHaveLength(2);
+    } finally {
+      await server.close();
+    }
+  });
+
+  test('새 설정 버튼이 현재 탭 기준 골격을 만든다', async ({ ctx, extId }) => {
+    const server = await startServer();
+    try {
+      const target = await ctx.newPage();
+      await target.goto(server.url);
+      const panel = await ctx.newPage();
+      await panel.goto(`chrome-extension://${extId}/panel/panel.html`);
+
+      await panel.locator('.tab[data-tab="config"]').click();
+      await panel.locator('#new-config').click();
+
+      const cfg = JSON.parse(await panel.locator('#config').inputValue());
+      expect(cfg.target.baseUrl).toContain('127.0.0.1');
+      expect(cfg.selectors).toEqual({});
+      // apiBaseUrl 없이도 유효한 설정이어야 한다
+      await expect(panel.locator('#config-status')).toHaveClass(/ok/);
     } finally {
       await server.close();
     }
