@@ -66,7 +66,11 @@ ZIP을 받아 압축을 풀고, `chrome://extensions` → **개발자 모드** �
 `apiBaseUrl` 은 **API 선행 세팅을 쓸 때만** 필요합니다. 이미 로그인된 세션을 그대로
 검증할 거라면 `baseUrl` 하나로 충분합니다.
 
-**셀렉터 탭** — 설정이 아직 없어도 됩니다. 고른 셀렉터를 담을 설정이 없으면
+**셀렉터 탭** — 셀렉터는 *무엇을 가리키는가*이고, `uiFlow`는 *무엇을 하는가*입니다.
+**셀렉터만 모아서는 실행할 것이 생기지 않습니다.** 그래서 각 셀렉터 옆의
+`클릭` · `보임` · `없음` 버튼으로 흐름 단계를 바로 만들 수 있습니다.
+
+설정이 아직 없어도 됩니다. 고른 셀렉터를 담을 설정이 없으면
 현재 탭을 기준으로 자동 생성됩니다. `요소 선택 시작`을 누르고 대상 페이지에서 요소를 클릭하면
 안정적인 셀렉터(`data-testid` > `id` > `name` > `aria-label` > 최단 CSS 경로)가
 자동 생성되어 설정의 `selectors`에 추가됩니다. <kbd>Esc</kbd>로 취소합니다.
@@ -192,7 +196,7 @@ $env:CONDI_CONFIG = "config/test-config.member.json"; npx playwright test
 
 | 잡 | 트리거 | 하는 일 |
 |---|---|---|
-| `validate` | main push, PR | `tsc --noEmit` · 확장 모듈 동기화 검사 · `config/*.json` 전 프로필 스키마 검증 · 테스트 52건 |
+| `validate` | main push, PR | `tsc --noEmit` · 확장 모듈 동기화 검사 · `config/*.json` 전 프로필 스키마 검증 · 테스트 54건 |
 | `auto-merge` | PR (라벨 `automerge`) | GitHub 네이티브 auto-merge를 켬 |
 
 자동 머지를 쓰려면 PR에 **`automerge` 라벨**만 붙이면 됩니다.

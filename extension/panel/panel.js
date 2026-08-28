@@ -31,7 +31,12 @@ chrome.runtime.onMessage.addListener((msg) => {
       addLog('info', e.profile, `타겟 ${e.target}`);
     } else if (e.phase === 'done') {
       $('summary').textContent = `통과 ${e.passed} · 실패 ${e.failed}`;
-      if (e.detail) addLog('info', '완료', e.detail);
+      // uiFlow 가 비어 실행할 것이 없었던 경우를 성공처럼 보이게 두면 안 된다
+      if (e.status === 'empty') {
+        addLog('skip', '실행할 UI 단계가 없습니다', e.detail);
+      } else if (e.detail) {
+        addLog('info', '완료', e.detail);
+      }
     } else {
       addLog(e.status, e.name, e.detail);
     }
@@ -160,11 +165,17 @@ function renderFlow() {
 }
 
 /* ── 설정 로드/저장 ── */
-const stored = await chrome.storage.local.get(STORAGE_KEY);
-if (stored[STORAGE_KEY]) {
-  $('config').value = stored[STORAGE_KEY];
-  applyConfig(stored[STORAGE_KEY]);
-}
+// 최상위 await 를 쓰면 그 지점에서 모듈 평가가 멈춘다. 멈춘 동안 도착한 메시지는
+// 아직 초기화되지 않은 모듈 상수를 건드려 조용히 실패한다(TDZ).
+// 저장된 설정 로드는 부수 작업이므로 평가를 막지 않도록 비동기로 떼어낸다.
+void (async () => {
+  const stored = await chrome.storage.local.get(STORAGE_KEY);
+  // 그 사이 피커로 설정이 이미 생겼다면 덮어쓰지 않는다
+  if (stored[STORAGE_KEY] && !config) {
+    $('config').value = stored[STORAGE_KEY];
+    applyConfig(stored[STORAGE_KEY]);
+  }
+})();
 
 $('config').addEventListener('input', (e) => applyConfig(e.target.value));
 
@@ -415,6 +426,19 @@ async function newSkeletonConfig() {
   };
 }
 
+/**
+ * 셀렉터 목록.
+ *
+ * 셀렉터를 모으는 것만으로는 실행할 것이 생기지 않는다. selectors 는 '무엇을 가리키는가'
+ * 이고, uiFlow 가 '무엇을 하는가'다. 그래서 각 셀렉터 옆에 흐름 단계를 바로 추가하는
+ * 버튼을 둔다. 이게 없으면 셀렉터만 모아 두고 실행했을 때 아무 일도 일어나지 않는다.
+ */
+const STEP_BUTTONS = [
+  { action: 'click', label: '클릭', title: '이 요소를 클릭하는 단계를 추가' },
+  { action: 'expectVisible', label: '보임', title: '이 요소가 보여야 한다는 검증을 추가' },
+  { action: 'expectHidden', label: '없음', title: '이 요소가 없어야 한다는 검증을 추가' },
+];
+
 function renderSelectors() {
   const list = $('selector-list');
   list.innerHTML = '';
@@ -430,9 +454,31 @@ function renderSelectors() {
     n.textContent = name;
     const c = document.createElement('code');
     c.textContent = selector;
-    li.append(n, c);
+
+    const actions = document.createElement('div');
+    actions.className = 'sel-actions';
+    for (const { action, label, title } of STEP_BUTTONS) {
+      const b = document.createElement('button');
+      b.textContent = label;
+      b.title = title;
+      b.dataset.action = action;
+      b.dataset.target = name;
+      b.addEventListener('click', () => addFlowStep(name, action));
+      actions.appendChild(b);
+    }
+
+    li.append(n, c, actions);
     list.appendChild(li);
   }
+}
+
+/** 셀렉터 하나에 대해 uiFlow 단계를 덧붙인다 */
+function addFlowStep(target, action) {
+  if (!config) return;
+  config.uiFlow = config.uiFlow ?? [];
+  config.uiFlow.push({ action, target });
+  syncConfig();
+  addLog('pass', `단계 추가: ${action} · ${target}`, `UI 흐름 ${config.uiFlow.length}단계`);
 }
 
 /* ── 조건 매트릭스 실행 ──

@@ -108,3 +108,11 @@ kbd { background: var(--code); border: 1px solid var(--border); border-radius: 3
 }
 .matrix td.ok { color: var(--pass); }
 .matrix td.ng { color: var(--fail); font-weight: 700; }
+
+/* 셀렉터별 흐름 단계 추가 버튼 */
+.sel-actions { display: flex; gap: .25rem; margin-top: .3rem; }
+.sel-actions button {
+  font-size: .7rem; padding: .1rem .4rem; border-radius: 5px;
+  background: var(--bg); color: var(--muted); border: 1px solid var(--border);
+}
+.sel-actions button:hover { color: var(--fg); border-color: var(--accent); }
