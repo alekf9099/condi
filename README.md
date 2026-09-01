@@ -202,7 +202,7 @@ $env:CONDI_CONFIG = "config/test-config.member.json"; npx playwright test
 
 | 잡 | 트리거 | 하는 일 |
 |---|---|---|
-| `validate` | main push, PR | `tsc --noEmit` · 확장 모듈 동기화 검사 · `config/*.json` 전 프로필 스키마 검증 · 테스트 55건 |
+| `validate` | main push, PR | `tsc --noEmit` · 확장 모듈 동기화 검사 · `config/*.json` 전 프로필 스키마 검증 · 테스트 59건 |
 | `auto-merge` | PR (라벨 `automerge`) | GitHub 네이티브 auto-merge를 켬 |
 
 자동 머지를 쓰려면 PR에 **`automerge` 라벨**만 붙이면 됩니다.
