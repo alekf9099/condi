@@ -27,10 +27,30 @@ const FIXTURE = `
   </ul>
   <section><div><span class="deep">깊은 요소</span></div></section>
   <p>이름 없는 문단</p>
+  <!-- 사이드바 메뉴처럼 mousedown 단계에서 이동을 시작하는 요소 (SPA 라우터 흉내) -->
+  <a id="navLink" href="#moved">릴리즈노트</a>
 `;
 
 async function setup(page: Page) {
   await page.setContent(`<!doctype html><meta charset="utf-8"><body>${FIXTURE}</body>`);
+  // 페이지가 어떤 입력에 반응했는지 기록하고, 확장 API 를 흉내 낸다
+  await page.evaluate(() => {
+    const w = window as unknown as { __reacted: string[]; chrome: unknown; __picked: unknown[] };
+    w.__reacted = [];
+    w.__picked = [];
+    for (const type of ['pointerdown', 'mousedown', 'mouseup', 'click']) {
+      document.getElementById('navLink')!.addEventListener(type, () => w.__reacted.push(type));
+    }
+    w.chrome = {
+      runtime: {
+        onMessage: { addListener: () => {} },
+        sendMessage: (msg: { type: string }) => {
+          if (msg.type === 'CONDI_PICK_RESULT') w.__picked.push(msg);
+          return Promise.resolve();
+        },
+      },
+    };
+  });
   await page.addScriptTag({ content: SELECTOR });
   await page.addScriptTag({ content: PICKER });
 }
@@ -113,5 +133,39 @@ test.describe('셀렉터 피커', () => {
       expect(r.matchCount, `${css} → ${r.selector} 가 ${r.matchCount}개 매치`).toBe(1);
       expect(r.resolvesToSameElement, `${css} → ${r.selector}`).toBe(true);
     }
+  });
+
+  test('고르는 동안에는 페이지가 입력에 반응하지 않는다', async ({ page }) => {
+    // 사이드바 메뉴는 보통 mousedown 에서 이동을 시작한다. click 만 막으면
+    // 요소를 고르려고 누르는 순간 화면이 넘어가 요소를 담을 수 없다.
+    await setup(page);
+    await page.evaluate(() =>
+      (window as unknown as { __condiPicker: { start: () => void } }).__condiPicker.start(),
+    );
+
+    await page.click('#navLink');
+
+    const state = await page.evaluate(() => {
+      const w = window as unknown as { __reacted: string[]; __picked: { selector: string }[] };
+      return { reacted: w.__reacted, picked: w.__picked };
+    });
+    // 페이지 쪽 핸들러는 하나도 돌지 않아야 한다
+    expect(state.reacted, `페이지가 반응함: ${state.reacted.join(', ')}`).toEqual([]);
+    // 그러면서도 선택은 정상적으로 이뤄져야 한다
+    expect(state.picked).toHaveLength(1);
+    expect(state.picked[0].selector).toBe('#navLink');
+  });
+
+  test('선택이 끝나면 페이지가 다시 정상 동작한다', async ({ page }) => {
+    await setup(page);
+    await page.evaluate(() =>
+      (window as unknown as { __condiPicker: { start: () => void } }).__condiPicker.start(),
+    );
+    await page.click('#navLink'); // 여기서 피커가 꺼진다
+
+    await page.click('#navLink');
+    const reacted = await page.evaluate(() => (window as unknown as { __reacted: string[] }).__reacted);
+    expect(reacted).toContain('mousedown');
+    expect(reacted).toContain('click');
   });
 });
