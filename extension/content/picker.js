@@ -24,6 +24,33 @@
     });
   }
 
+  /**
+   * 고르는 동안 페이지가 반응하면 안 되는 입력들.
+   *
+   * click 만 막아서는 부족하다. 사이드바 메뉴나 SPA 라우터는 보통 mousedown/pointerdown
+   * 에서 이동을 시작하는데, 그건 click 보다 먼저 일어난다. 그래서 요소를 고르려고
+   * 누르는 순간 화면이 넘어가 버린다. 선택은 비파괴적이어야 하므로 전부 삼킨다.
+   */
+  const SWALLOWED = [
+    'pointerdown',
+    'pointerup',
+    'mousedown',
+    'mouseup',
+    'auxclick',
+    'dblclick',
+    'submit',
+    'touchstart',
+    'touchend',
+  ];
+
+  function swallow(e) {
+    if (!active) return;
+    if (e.target?.closest?.('.condi-pick-overlay')) return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+  }
+
   function start() {
     if (active) return;
     active = true;
@@ -33,6 +60,7 @@
     document.addEventListener('mousemove', onMove, true);
     document.addEventListener('click', onClick, true);
     document.addEventListener('keydown', onKey, true);
+    for (const type of SWALLOWED) document.addEventListener(type, swallow, true);
   }
 
   function stop() {
@@ -43,6 +71,7 @@
     document.removeEventListener('mousemove', onMove, true);
     document.removeEventListener('click', onClick, true);
     document.removeEventListener('keydown', onKey, true);
+    for (const type of SWALLOWED) document.removeEventListener(type, swallow, true);
   }
 
   function onMove(e) {
@@ -65,10 +94,14 @@
     }
   }
 
+  // 확장 밖(테스트/디버깅)에서도 켜고 끌 수 있게 노출한다
+  window.__condiPicker = { start, stop };
+
   function onClick(e) {
     if (!active) return;
     e.preventDefault();
     e.stopPropagation();
+    if (e.stopImmediatePropagation) e.stopImmediatePropagation();
     const el = document.elementFromPoint(e.clientX, e.clientY);
     if (!el) return;
     const selector = buildSelector(el);
