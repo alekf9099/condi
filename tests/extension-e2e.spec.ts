@@ -513,3 +513,135 @@ test.describe('패널 — 조건 매트릭스', () => {
     }
   });
 });
+
+/**
+ * 흐름 편집기.
+ *
+ * 녹화 결과에는 늘 다듬을 것이 섞인다. 순서 변경·삭제·값 수정이 JSON 편집으로만
+ * 가능하면 쓸 수 없다. `when` 은 특히 중요하다 — 조건부가 이 도구의 존재 이유인데
+ * UI 에 없으면 핵심 기능이 편집기 뒤에 숨는다.
+ */
+test.describe('패널 — 흐름 편집기', () => {
+  /** 설정을 패널에 넣고 실행 탭으로 돌아온다 */
+  async function loadConfig(panel: import('@playwright/test').Page, cfg: unknown) {
+    await panel.locator('.tab[data-tab="config"]').click();
+    await panel.locator('#config').fill(JSON.stringify(cfg));
+    await expect(panel.locator('#config-status')).toHaveClass(/ok/);
+    await panel.locator('.tab[data-tab="run"]').click();
+  }
+
+  async function openPanel(ctx: BrowserContext, extId: string, url: string) {
+    const target = await ctx.newPage();
+    await target.goto(url);
+    await target.bringToFront();
+    const panel = await ctx.newPage();
+    await panel.goto(`chrome-extension://${extId}/panel/panel.html`);
+    return { target, panel };
+  }
+
+  test('단계 순서를 바꾸고 하나만 지울 수 있다', async ({ ctx, extId }) => {
+    const server = await startServer();
+    try {
+      const { panel } = await openPanel(ctx, extId, server.url);
+      const cfg = makeConfig(server.url, { userRole: 'admin', testDataCondition: 'noOrder' });
+      cfg.uiFlow = [
+        { action: 'expectVisible', target: 'welcomeBanner' },
+        { action: 'expectVisible', target: 'adminDashboardMenu' },
+        { action: 'expectVisible', target: 'emptyOrders' },
+      ] as never;
+      await loadConfig(panel, cfg);
+
+      // 두 번째 단계를 위로
+      await panel.locator('.step').nth(1).locator('button[data-op="up"]').click();
+      let after = JSON.parse(await panel.locator('#config').inputValue());
+      expect(after.uiFlow.map((s: { target: string }) => s.target)).toEqual([
+        'adminDashboardMenu',
+        'welcomeBanner',
+        'emptyOrders',
+      ]);
+
+      // 가운데 단계만 삭제
+      await panel.locator('.step').nth(1).locator('button[data-op="del"]').click();
+      after = JSON.parse(await panel.locator('#config').inputValue());
+      expect(after.uiFlow.map((s: { target: string }) => s.target)).toEqual([
+        'adminDashboardMenu',
+        'emptyOrders',
+      ]);
+      await expect(panel.locator('#flow-count')).toHaveText('2단계');
+    } finally {
+      await server.close();
+    }
+  });
+
+  test('단계의 값을 고칠 수 있다', async ({ ctx, extId }) => {
+    const server = await startServer();
+    try {
+      const { panel } = await openPanel(ctx, extId, server.url);
+      const cfg = makeConfig(server.url, { userRole: 'admin', testDataCondition: 'noOrder' });
+      cfg.uiFlow = [{ action: 'expectText', target: 'emptyOrders', value: '틀린값' }] as never;
+      await loadConfig(panel, cfg);
+
+      await panel.locator('.step-head').first().click();
+      await panel.locator('.step-edit input[type="text"]').first().fill('주문 없음');
+      await panel.locator('.step-edit input[type="text"]').first().blur();
+
+      const after = JSON.parse(await panel.locator('#config').inputValue());
+      expect(after.uiFlow[0].value).toBe('주문 없음');
+    } finally {
+      await server.close();
+    }
+  });
+
+  test('UI로 붙인 when이 실제 실행에 반영된다', async ({ ctx, extId }) => {
+    // 이 도구의 핵심. 조건을 UI 에서 붙일 수 없으면 조건부가 JSON 편집에 갇힌다.
+    const server = await startServer();
+    try {
+      const { panel } = await openPanel(ctx, extId, server.url);
+      const cfg = makeConfig(server.url, { userRole: 'admin', testDataCondition: 'noOrder' });
+      cfg.uiFlow = [
+        { action: 'expectVisible', target: 'welcomeBanner' },
+        { action: 'expectVisible', target: 'emptyOrders' },
+      ] as never;
+      await loadConfig(panel, cfg);
+
+      // 두 번째 단계에 "userRole 이 member 일 때만" 조건을 붙인다
+      await panel.locator('.step-head').nth(1).click();
+      await panel.locator('.step-edit select').selectOption('userRole');
+      await panel.locator('.step-edit input[data-field="whenValue"]').fill('member');
+      await panel.locator('.step-edit input[data-field="whenValue"]').blur();
+
+      const after = JSON.parse(await panel.locator('#config').inputValue());
+      expect(after.uiFlow[1].when).toEqual({ 'conditions.userRole': 'member' });
+      await expect(panel.locator('.when-chip')).toHaveText('userRole=member');
+
+      // 조건이 admin 이므로 두 번째 단계는 실행 대상에서 빠져 1단계만 돈다
+      await panel.locator('#run').click();
+      await expect(panel.locator('#summary')).toContainText('통과 1', { timeout: 30_000 });
+      await expect(panel.locator('#summary')).toContainText('실패 0');
+    } finally {
+      await server.close();
+    }
+  });
+
+  test('조건을 다시 떼면 항상 실행으로 돌아온다', async ({ ctx, extId }) => {
+    const server = await startServer();
+    try {
+      const { panel } = await openPanel(ctx, extId, server.url);
+      const cfg = makeConfig(server.url, { userRole: 'admin', testDataCondition: 'noOrder' });
+      cfg.uiFlow = [
+        { action: 'expectVisible', target: 'welcomeBanner', when: { 'conditions.userRole': 'member' } },
+      ] as never;
+      await loadConfig(panel, cfg);
+      await expect(panel.locator('.when-chip')).toHaveCount(1);
+
+      await panel.locator('.step-head').first().click();
+      await panel.locator('.step-edit select').selectOption('');
+
+      const after = JSON.parse(await panel.locator('#config').inputValue());
+      expect(after.uiFlow[0].when).toBeUndefined();
+      await expect(panel.locator('.when-chip')).toHaveCount(0);
+    } finally {
+      await server.close();
+    }
+  });
+});

@@ -79,22 +79,49 @@ kbd { background: var(--code); border: 1px solid var(--border); border-radius: 3
       padding: 0 .25rem; font-size: .72rem; font-family: ui-monospace, monospace; }
 .empty { color: var(--muted); font-size: .78rem; font-style: italic; }
 
-/* ── UI 흐름 목록 ── */
+/* ── UI 흐름 목록 겸 편집기 ── */
 .flow { margin-bottom: 1rem; }
-.flow-list { list-style: none; margin: .5rem 0 0; padding: 0; max-height: 180px; overflow-y: auto; }
-.flow-list li {
+.flow-list { list-style: none; margin: .5rem 0 0; padding: 0; max-height: 260px; overflow-y: auto; }
+.flow-list .empty { padding: .3rem 0; }
+
+.step { border-bottom: 1px solid var(--border); }
+.step-head {
   display: flex; align-items: baseline; gap: .4rem; flex-wrap: wrap;
-  padding: .3rem 0; border-bottom: 1px solid var(--border); font-size: .78rem;
+  padding: .35rem 0; cursor: pointer;
 }
-.flow-list .act {
+.step-head:hover { background: var(--code); }
+.act {
   font-family: ui-monospace, monospace; font-size: .72rem;
   color: var(--accent); background: var(--code);
   padding: .05rem .35rem; border-radius: 4px; flex-shrink: 0;
 }
-.flow-list em {
-  font-style: normal; font-size: .68rem; color: var(--muted);
-  border: 1px solid var(--border); border-radius: 4px; padding: 0 .3rem;
+.step-label { font-size: .78rem; overflow-wrap: anywhere; }
+.when-chip {
+  font-style: normal; font-size: .68rem; color: var(--accent);
+  border: 1px solid var(--accent); border-radius: 4px; padding: 0 .3rem;
 }
+.step-btns { margin-left: auto; display: flex; gap: .15rem; flex-shrink: 0; }
+.step-btns button {
+  font-size: .7rem; line-height: 1; padding: .15rem .3rem; border-radius: 4px;
+  background: var(--bg); color: var(--muted); border: 1px solid var(--border);
+}
+.step-btns button:hover:not(:disabled) { color: var(--fg); border-color: var(--accent); }
+.step-btns button:disabled { opacity: .3; }
+
+.step-edit {
+  display: grid; gap: .4rem; padding: .1rem 0 .6rem;
+  border-top: 1px dashed var(--border); margin-top: .1rem;
+}
+.step-edit label {
+  display: grid; grid-template-columns: 3rem 1fr auto; gap: .35rem;
+  align-items: center; font-size: .72rem; color: var(--muted);
+}
+.step-edit input, .step-edit select {
+  font: inherit; font-size: .75rem; padding: .2rem .35rem; border-radius: 5px;
+  border: 1px solid var(--border); background: var(--card); color: var(--fg); min-width: 0;
+}
+.step-edit input:disabled { opacity: .45; }
+
 #record.is-recording { border-color: var(--fail); color: var(--fail); font-weight: 600; }
 
 /* ── 매트릭스 결과 ── */

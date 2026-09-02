@@ -136,33 +136,179 @@ function syncConfig() {
   $('config').value = text;
 }
 
+/** 값을 받는 액션 — 편집기에 입력란을 띄운다 */
+const VALUE_ACTIONS = new Set(['fill', 'select', 'expectText', 'expectValue', 'goto', 'waitForUrl']);
+
+/** 펼쳐 놓은 단계의 인덱스 (다시 그려도 유지) */
+let expandedStep = -1;
+
+/**
+ * UI 흐름 목록 겸 편집기.
+ *
+ * 녹화 결과에는 늘 다듬을 것이 섞인다. 순서를 바꾸고 한 단계만 지우고 값을 고치는
+ * 일이 JSON 편집으로만 가능하면 도구를 쓸 수가 없다.
+ * `when` 도 마찬가지다. 조건부가 이 도구의 존재 이유인데 UI 에 없으면
+ * 핵심 기능이 편집기 뒤에 숨는다.
+ */
 function renderFlow() {
   const list = $('flow-list');
   const steps = config?.uiFlow ?? [];
   $('flow-count').textContent = `${steps.length}단계`;
   $('clear-flow').disabled = !steps.length;
   list.innerHTML = '';
+
   if (!steps.length) {
-    list.innerHTML = '<li class="empty">녹화하거나 설정에서 직접 추가하세요.</li>';
+    expandedStep = -1;
+    list.innerHTML = '<li class="empty">녹화하거나 셀렉터 탭에서 추가하세요.</li>';
     return;
   }
-  for (const step of steps) {
-    const li = document.createElement('li');
-    const a = document.createElement('span');
-    a.className = 'act';
-    a.textContent = step.action;
-    li.appendChild(a);
-    const t = document.createElement('span');
-    t.textContent = [step.target, step.value].filter(Boolean).join(' · ');
-    li.appendChild(t);
-    if (step.when) {
-      const w = document.createElement('em');
-      w.textContent = Object.entries(step.when).map(([k, v]) => `${k.split('.').pop()}=${v}`).join(', ');
-      li.appendChild(w);
-    }
-    list.appendChild(li);
-  }
+
+  steps.forEach((step, i) => list.appendChild(renderStep(step, i)));
 }
+
+function renderStep(step, i) {
+  const li = document.createElement('li');
+  li.className = 'step';
+
+  // ── 접힌 줄 ──
+  const head = document.createElement('div');
+  head.className = 'step-head';
+
+  const act = document.createElement('span');
+  act.className = 'act';
+  act.textContent = step.action;
+
+  const label = document.createElement('span');
+  label.className = 'step-label';
+  label.textContent = [step.target, step.value ?? step.count].filter((v) => v !== undefined && v !== '').join(' · ');
+
+  head.append(act, label);
+
+  if (step.when) {
+    const chip = document.createElement('em');
+    chip.className = 'when-chip';
+    chip.textContent = Object.entries(step.when)
+      .map(([k, v]) => `${k.split('.').pop()}=${v}`)
+      .join(', ');
+    head.appendChild(chip);
+  }
+
+  const btns = document.createElement('span');
+  btns.className = 'step-btns';
+  for (const [op, text, title] of [
+    ['up', '↑', '위로'],
+    ['down', '↓', '아래로'],
+    ['del', '✕', '이 단계 삭제'],
+  ]) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.dataset.op = op;
+    b.textContent = text;
+    b.title = title;
+    b.disabled = (op === 'up' && i === 0) || (op === 'down' && i === config.uiFlow.length - 1);
+    b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      mutateStep(i, op);
+    });
+    btns.appendChild(b);
+  }
+  head.appendChild(btns);
+  head.addEventListener('click', () => {
+    expandedStep = expandedStep === i ? -1 : i;
+    renderFlow();
+  });
+  li.appendChild(head);
+
+  // ── 펼친 편집기 ──
+  if (expandedStep === i) li.appendChild(renderStepEditor(step, i));
+  return li;
+}
+
+function renderStepEditor(step, i) {
+  const box = document.createElement('div');
+  box.className = 'step-edit';
+
+  // 값 (액션에 따라 의미가 다르다)
+  if (VALUE_ACTIONS.has(step.action) || step.action === 'expectCount') {
+    const isCount = step.action === 'expectCount';
+    const row = document.createElement('label');
+    row.textContent = isCount ? '개수' : '값';
+    const input = document.createElement('input');
+    input.type = isCount ? 'number' : 'text';
+    input.value = String((isCount ? step.count : step.value) ?? '');
+    input.addEventListener('change', () => {
+      if (isCount) step.count = Number(input.value) || 0;
+      else step.value = input.value;
+      syncConfig();
+    });
+    row.appendChild(input);
+    box.appendChild(row);
+  }
+
+  // 조건 — 이 단계를 언제 실행할지
+  const whenRow = document.createElement('label');
+  whenRow.textContent = '조건';
+
+  const keySel = document.createElement('select');
+  keySel.dataset.field = 'whenKey';
+  const none = document.createElement('option');
+  none.value = '';
+  none.textContent = '항상 실행';
+  keySel.appendChild(none);
+
+  const currentKey = step.when ? Object.keys(step.when)[0]?.split('.').pop() ?? '' : '';
+  for (const key of Object.keys(config.conditions ?? {})) {
+    const opt = document.createElement('option');
+    opt.value = key;
+    opt.textContent = key;
+    opt.selected = key === currentKey;
+    keySel.appendChild(opt);
+  }
+
+  const valInput = document.createElement('input');
+  valInput.dataset.field = 'whenValue';
+  valInput.placeholder = '기대값';
+  valInput.value = step.when ? String(Object.values(step.when)[0] ?? '') : '';
+  valInput.disabled = !currentKey;
+
+  const applyWhen = () => {
+    const key = keySel.value;
+    if (!key) {
+      delete step.when;
+    } else {
+      // 조건 원래 값의 타입을 보존해야 matchesWhen 이 일치를 잡는다
+      step.when = { [`conditions.${key}`]: coerce(valInput.value, config.conditions[key]) };
+    }
+    syncConfig();
+  };
+  keySel.addEventListener('change', () => {
+    valInput.disabled = !keySel.value;
+    // 키를 고르면 현재 조건값을 기본으로 채워 준다
+    if (keySel.value && !valInput.value) valInput.value = String(config.conditions[keySel.value] ?? '');
+    applyWhen();
+  });
+  valInput.addEventListener('change', applyWhen);
+
+  whenRow.append(keySel, valInput);
+  box.appendChild(whenRow);
+  return box;
+}
+
+/** 단계 순서 변경·삭제 */
+function mutateStep(i, op) {
+  const steps = config.uiFlow;
+  if (op === 'del') {
+    steps.splice(i, 1);
+    expandedStep = -1;
+  } else {
+    const j = op === 'up' ? i - 1 : i + 1;
+    if (j < 0 || j >= steps.length) return;
+    [steps[i], steps[j]] = [steps[j], steps[i]];
+    if (expandedStep === i) expandedStep = j;
+  }
+  syncConfig();
+}
+
 
 /* ── 설정 로드/저장 ── */
 // 최상위 await 를 쓰면 그 지점에서 모듈 평가가 멈춘다. 멈춘 동안 도착한 메시지는
