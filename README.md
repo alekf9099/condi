@@ -94,6 +94,19 @@ apiSetup 실행 → 쿠키·헤더 주입 → baseUrl 이동 → 스토리지 �
 
 단계별 통과/실패가 패널에 쌓이고, 실패하면 무엇을 기다렸는지가 함께 표시됩니다.
 
+**흐름 편집** — UI 흐름 목록의 단계를 누르면 편집기가 열립니다.
+
+| 조작 | 하는 일 |
+|---|---|
+| `↑` `↓` | 단계 순서 변경 |
+| `✕` | 그 단계만 삭제 |
+| 값 / 개수 | `fill`·`expectText`·`expectCount` 등의 값 수정 |
+| 조건 | **이 단계를 언제 실행할지** — 조건 키를 고르고 기대값을 적으면 `when`이 붙습니다 |
+
+조건을 붙인 단계에는 `userRole=admin` 같은 표시가 달리고, 조건이 맞지 않으면
+실행 대상에서 빠집니다. `항상 실행`을 고르면 조건이 떨어집니다.
+한 단계에 조건을 둘 이상 걸려면 설정 탭에서 JSON으로 직접 적으면 됩니다.
+
 **매트릭스 탭** — 조건마다 시험할 값을 쉼표로 나눠 적으면 **모든 조합을 차례로 실행**하고
 결과를 격자로 보여줍니다.
 
@@ -202,7 +215,7 @@ $env:CONDI_CONFIG = "config/test-config.member.json"; npx playwright test
 
 | 잡 | 트리거 | 하는 일 |
 |---|---|---|
-| `validate` | main push, PR | `tsc --noEmit` · 확장 모듈 동기화 검사 · `config/*.json` 전 프로필 스키마 검증 · 테스트 59건 |
+| `validate` | main push, PR | `tsc --noEmit` · 확장 모듈 동기화 검사 · `config/*.json` 전 프로필 스키마 검증 · 테스트 63건 |
 | `auto-merge` | PR (라벨 `automerge`) | GitHub 네이티브 auto-merge를 켬 |
 
 자동 머지를 쓰려면 PR에 **`automerge` 라벨**만 붙이면 됩니다.
